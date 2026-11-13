@@ -250,6 +250,29 @@ def mark_unknown(conn: sqlite3.Connection, intent_id: str, reason: str, now: str
         )
 
 
+def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row is not None else default
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
+
+
+def find_valid_approval(
+    conn: sqlite3.Connection, draft_id: str, revision: int, kind: str, now: str | None = None
+) -> str | None:
+    now = now or utcnow()
+    row = conn.execute(
+        "SELECT id FROM approvals WHERE draft_id = ? AND revision = ? AND kind = ? AND consumed_at IS NULL AND (expires_at IS NULL OR expires_at > ?) ORDER BY created_at DESC LIMIT 1",
+        (draft_id, revision, kind, now),
+    ).fetchone()
+    return row["id"] if row is not None else None
+
+
 def ingest_event(conn: sqlite3.Connection, source: str, external_id: str, payload: dict, now: str | None = None) -> bool:
     now = now or utcnow()
     try:

@@ -1,0 +1,14 @@
+# Configuration locale de l'assistant — copier vers config.toml (non versionné).
+# Le jeton du bot Telegram ne se met JAMAIS ici : variable d'environnement TELEGRAM_BOT_TOKEN.
+
+# Identifiants numériques Telegram (pas des usernames). Chat privé uniquement.
+owner_id = 123456789
+chat_id = 123456789
+
+db_path = "data/assistant.db"
+timezone = "Africa/Tunis"
+approval_ttl_seconds = 3600
+poll_timeout_seconds = 25
+
+# URN du membre LinkedIn, à renseigner après vérification OAuth (phase 6).
+linkedin_account = "urn:li:person:UNCONFIGURED"
