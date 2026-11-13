@@ -2,7 +2,7 @@
 
 Assistant personnel pour rechercher, rédiger, corriger et publier du contenu LinkedIn depuis Telegram, **uniquement après validations explicites**.
 
-**Statut au 13 novembre 2026 : phases 2 et 3 implémentées localement (socle conversationnel, archive centrale, import générique) — 50 tests sans réseau, publication simulée. Aucun bot/compte créé, aucune intégration authentifiée ni publication réelle. Dépôt privé : github.com/MaherAbderrahim/linkedin-ai-assistant.**
+**Statut au 13 novembre 2026 : phases 2 à 4 implémentées localement (socle conversationnel, archive centrale, import générique, profil descriptif et retrieval borné) — 61 tests sans réseau, publication simulée. Aucun bot/compte créé, aucune intégration authentifiée ni publication réelle. Dépôt privé : github.com/MaherAbderrahim/linkedin-ai-assistant.**
 
 ## Architecture : décisions validées et propositions
 
