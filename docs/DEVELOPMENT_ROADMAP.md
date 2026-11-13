@@ -2,6 +2,8 @@
 
 Date : 13 novembre 2026, Mission 0.5. **Socle validé (Python, SQLite central, Telegram, Tunisie/`Africa/Tunis`, API officielle, 0 €, validations séparées, archive textuelle sans fichiers images).** Les phases ci-dessous sont indépendamment livrables ; aucune estimation de délai n’est un engagement. Aucun accès fournisseur n’est présumé.
 
+**État d’avancement :** phases 2 et 3 livrées localement (tests simulés passants, 50 tests sans réseau) ; gates G2/G3 non validés humainement, phases suivantes non démarrées. Aucune action externe effectuée.
+
 ## Principes
 
 - Distinguer autorisation de coder, de configurer un compte et d’effectuer une action externe. Chaque test réel (surtout publication/upload) exige une autorisation séparée sur le contenu exact.

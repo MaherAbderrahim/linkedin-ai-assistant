@@ -1,6 +1,6 @@
 # LinkedIn AI Assistant
 
-Assistant personnel piloté par Telegram. État : **Mission 0.5 documentaire poussée sur GitHub ; socle validé ; implémentation autorisée par l’utilisateur le 13 novembre 2026 ; modalités détaillées encore proposées**.
+Assistant personnel piloté par Telegram. État : **Phases 2–3 implémentées localement (socle conversationnel, archive centrale, import générique ; 50 tests sans réseau, publication simulée). Aucune intégration authentifiée ni action externe effectuée. Modalités détaillées encore proposées.**
 
 ## Autorisation de travail
 
@@ -12,7 +12,13 @@ Assistant personnel piloté par Telegram. État : **Mission 0.5 documentaire pou
 
 **Validés :** Python + SQLite, modularité et fournisseurs interchangeables, Telegram principal, n8n facultatif, Tunisie et `Africa/Tunis`, API officielle LinkedIn, budget 0 € sans paiement obligatoire, validations texte/image distinctes puis finale, archive centrale durable de tous les textes dont la rétention est permise et profil compact persistant, sans archive binaire d’images. Trois posts récents = échantillon, pas plafond de stockage.
 
-**Proposés / non vérifiés :** monolithe à processus unique, long polling, hôte, fournisseurs, scopes/permissions, conditions/consentements, paramètres de rétention/import/retrieval et rappels. Aucun code ni commande de lancement/test n’existe encore.
+**Proposés / non vérifiés :** hôte, fournisseurs, scopes/permissions, conditions/consentements, paramètres de rétention/import/retrieval et rappels. Monolithe processus unique et long polling implémentés, non éprouvés sur un compte réel.
+
+## Commandes
+
+- `python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]"` — installation locale (Windows ; Linux/macOS : `.venv/bin/python`)
+- `.venv/Scripts/python -m pytest -q` — tests sans réseau
+- `.venv/Scripts/linkedin-assistant --config config.toml` — démarrage ; sans `TELEGRAM_BOT_TOKEN`, mode simulation sans aucune action réseau. Le jeton ne va jamais dans un fichier versionné.
 
 ## Rules
 

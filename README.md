@@ -2,7 +2,7 @@
 
 Assistant personnel pour rechercher, rédiger, corriger et publier du contenu LinkedIn depuis Telegram, **uniquement après validations explicites**.
 
-**Statut au 13 novembre 2026 : Mission 0.5 documentaire poussée sur GitHub. Socle validé ; implémentation autorisée par l’utilisateur ; modalités détaillées encore proposées. Aucun bot/compte créé, aucune intégration authentifiée ni publication effectuée.**
+**Statut au 13 novembre 2026 : phases 2 et 3 implémentées localement (socle conversationnel, archive centrale, import générique) — 50 tests sans réseau, publication simulée. Aucun bot/compte créé, aucune intégration authentifiée ni publication réelle. Dépôt privé : github.com/MaherAbderrahim/linkedin-ai-assistant.**
 
 ## Architecture : décisions validées et propositions
 
@@ -44,7 +44,7 @@ Le **skill Apify exact n’est pas fourni ni audité** : ne pas lui substituer u
 | [FREE_SERVICES_BENCHMARK.md](docs/FREE_SERVICES_BENCHMARK.md) | Comparaison documentaire datée, quotas, pays, confidentialité, cartes et frais possibles |
 | [TEST_STRATEGY.md](docs/TEST_STRATEGY.md) | Tests futurs, invariants de sécurité, pannes, recette humaine et preuves attendues |
 
-Les neuf documents sont liés ci-dessus. Aucun guide d’installation ou commande de lancement n’est inventé : l’application n’existe pas encore.
+Les neuf documents sont liés ci-dessus. Code : `src/linkedin_assistant/` (bibliothèque standard uniquement), tests dans `tests/`. Installation locale : `python -m venv .venv` puis `.venv/Scripts/python -m pip install -e ".[dev]"` ; tests : `.venv/Scripts/python -m pytest -q` ; démarrage : `.venv/Scripts/linkedin-assistant --config config.toml` (mode simulation sans jeton, voir `config.example.toml`).
 
 ## Risques et blocages prioritaires
 
