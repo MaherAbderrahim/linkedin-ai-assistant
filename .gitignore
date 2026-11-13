@@ -1,0 +1,33 @@
+# Secrets et configuration locale
+.env
+.env.*
+*.local.toml
+secrets/
+
+# Base métier et données locales (ne jamais publier l'archive ni les journaux)
+*.sqlite
+*.sqlite3
+*.db
+*.db-wal
+*.db-shm
+data/
+backups/
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# OS / éditeur
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
