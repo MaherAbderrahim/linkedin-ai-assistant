@@ -2,7 +2,7 @@
 
 Date : 13 novembre 2026, Mission 0.5. **Socle validé (Python, SQLite central, Telegram, Tunisie/`Africa/Tunis`, API officielle, 0 €, validations séparées, archive textuelle sans fichiers images).** Les phases ci-dessous sont indépendamment livrables ; aucune estimation de délai n’est un engagement. Aucun accès fournisseur n’est présumé.
 
-**État d’avancement :** phases 2 à 4 livrées localement (tests simulés passants, 61 tests sans réseau) ; gates G2/G3/G4 non validés humainement, phases suivantes non démarrées. Aucune action externe effectuée.
+**État d’avancement :** phases 2 à 4 livrées localement, plus le cœur local de la phase 8 (rappels `Africa/Tunis`, `/lastpost`, `/reminder`, tick sans rafale) — 75 tests sans réseau passants ; gates non validés humainement, phases 5 à 7 non démarrées. Aucune action externe effectuée.
 
 ## Principes
 

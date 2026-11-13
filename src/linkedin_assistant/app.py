@@ -5,7 +5,7 @@ import logging
 import sys
 import time
 
-from . import db, inbox, purge, store
+from . import db, inbox, purge, reminders, store
 from .config import ConfigError, load
 from .conversation import Conversation
 from .publisher import SimulatedPublisher
@@ -70,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             inbox.poll_once(conn, client, config.poll_timeout_seconds)
             inbox.process_pending(conn, conversation.handle)
+            reminders.tick(conn, client, config.chat_id, store.utcnow())
         except TelegramError as exc:
             log.warning("Telegram indisponible : %s", exc)
             time.sleep(5)

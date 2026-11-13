@@ -1,6 +1,6 @@
 # LinkedIn AI Assistant
 
-Assistant personnel piloté par Telegram. État : **Phases 2–4 implémentées localement (socle conversationnel, archive centrale, import générique, profil descriptif et retrieval borné ; 61 tests sans réseau, publication simulée). Aucune intégration authentifiée ni action externe effectuée. Modalités détaillées encore proposées.**
+Assistant personnel piloté par Telegram. État : **Phases 2–4 et rappels locaux implémentés (socle conversationnel, archive centrale, import générique, profil descriptif, retrieval borné, rappels Africa/Tunis ; 75 tests sans réseau, publication simulée). Aucune intégration authentifiée ni action externe effectuée. Modalités détaillées encore proposées.**
 
 ## Autorisation de travail
 

@@ -3,8 +3,10 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-from . import store
+from . import reminders, store
 from .config import Config
+from .db import transaction
+from .hashing import NORM_VERSION, normalized_hash, sha256_text
 from .publisher import publish
 from .telegram import TelegramClient, escape_html, is_authorized, keyboard, split_message
 
@@ -48,7 +50,8 @@ class Conversation:
         if text == "/start":
             self._reply(
                 "Assistant LinkedIn personnel. /new crée un brouillon, envoyez ensuite le texte, "
-                "/preview affiche l'aperçu et les validations. Aucune publication sans bouton final dédié. "
+                "/preview affiche l'aperçu et les validations. /lastpost déclare une publication externe, "
+                "/reminder on|off gère les rappels. Aucune publication sans bouton final dédié. "
                 + SIMULATION_NOTE
             )
             return
@@ -66,6 +69,12 @@ class Conversation:
         if text == "/cancel":
             store.set_setting(self.conn, "active_draft", "")
             self._reply("Brouillon actif désélectionné (il reste en base, rien n'est supprimé).")
+            return
+        if text.startswith("/lastpost"):
+            self._declare_publication(text[len("/lastpost"):].strip())
+            return
+        if text.startswith("/reminder"):
+            self._reminder_command(text[len("/reminder"):].strip())
             return
         if text.startswith("/"):
             self._reply("Commande inconnue. /start, /new, /preview, /status, /cancel.")
@@ -164,6 +173,75 @@ class Conversation:
             self._reply(
                 "Résultat incertain : l'envoi a pu aboutir. Compte verrouillé, aucun retry automatique. "
                 "Réconciliation explicite requise avant toute nouvelle publication."
+            )
+
+    def _declare_publication(self, value: str) -> None:
+        if not value:
+            self._reply("Usage : /lastpost <date ISO>, ex. /lastpost 2026-11-10T09:00:00+01:00")
+            return
+        try:
+            declared = datetime.fromisoformat(value)
+        except ValueError:
+            self._reply("Date invalide. Usage : /lastpost 2026-11-10T09:00:00+01:00")
+            return
+        now = datetime.now(timezone.utc)
+        date_only = "T" not in value and " " not in value
+        if date_only:
+            precision = "day"
+            if declared.date() > now.astimezone(reminders.TZ).date():
+                self._reply("Date future refusée : déclarez une publication déjà effectuée.")
+                return
+        else:
+            precision = "second"
+            if declared.tzinfo is None:
+                self._reply("Ajoutez le décalage horaire, ex. 2026-11-10T09:00:00+01:00.")
+                return
+            if declared > now:
+                self._reply("Date future refusée : déclarez une publication déjà effectuée.")
+                return
+        post_id = store.new_id()
+        version_id = store.new_id()
+        now_iso = store.utcnow()
+        with transaction(self.conn):
+            self.conn.execute(
+                "INSERT INTO history_posts (id, account, current_version, published_at, published_at_precision, published_at_tz, confirmed_at, visibility, created_at, updated_at) "
+                "VALUES (?, ?, 1, ?, ?, NULL, NULL, NULL, ?, ?)",
+                (post_id, self.config.linkedin_account, value, precision, now_iso, now_iso),
+            )
+            self.conn.execute(
+                "INSERT INTO history_versions (id, post_id, version, text, exact_hash, normalized_hash, norm_version, authorship, observed_at) VALUES (?, ?, 1, '', ?, ?, ?, 'user', ?)",
+                (version_id, post_id, sha256_text(""), normalized_hash(""), NORM_VERSION, now_iso),
+            )
+            self.conn.execute(
+                "INSERT INTO history_sources (id, post_id, version_id, origin, method, imported_at, fields_json, policy_json) "
+                "VALUES (?, ?, ?, 'user_declared', 'telegram_declaration', ?, ?, ?)",
+                (
+                    store.new_id(),
+                    post_id,
+                    version_id,
+                    now_iso,
+                    '{"declared_via":"telegram"}',
+                    '{"storage":"allowed","basis":"déclaration directe de l’utilisateur"}',
+                ),
+            )
+        self._reply(
+            f"Publication externe déclarée : {value} (précision {precision}). "
+            "Les rappels utilisent cette date attestée, jamais la date d'import."
+        )
+
+    def _reminder_command(self, arg: str) -> None:
+        if arg == "on":
+            reminders.set_enabled(self.conn, True)
+            self._reply("Rappels activés : 9 h, tous les jours, seuil 120 h, Africa/Tunis (paramètres proposés).")
+        elif arg == "off":
+            reminders.set_enabled(self.conn, False)
+            self._reply("Rappels désactivés. Le bot reste utilisable sans rappels.")
+        else:
+            settings = reminders._settings(self.conn)
+            self._reply(
+                f"Rappels : {'activés' if settings['enabled'] else 'désactivés'}, "
+                f"heure {settings['hour']} h, jours {sorted(settings['days'])}, "
+                f"seuil {settings['inactivity_hours']} h, dernier envoi {settings['last_date'] or 'jamais'}."
             )
 
     def _status(self) -> str:
