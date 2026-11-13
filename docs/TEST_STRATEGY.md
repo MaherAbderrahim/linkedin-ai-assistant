@@ -1,6 +1,6 @@
 # Stratégie de tests et preuves d’acceptation
 
-Date : 13 novembre 2026, Mission 0.5. **Stratégie uniquement : aucune suite applicative n’existe et aucun test de compte/API authentifiée n’a été effectué.** Les contrôles documentaires ne doivent pas être présentés comme la réussite des tests ci-dessous. Couvre le socle Mission 0 plus l’archive centrale, l’import indépendant, le profil descriptif, le retrieval borné et les images sans archive binaire.
+Date : 13 novembre 2026, Mission 0.6. **Une suite locale existe : 75 tests passants (unitaires et intégration, fournisseurs simulés). Aucun test de compte/API authentifiée, aucune publication réelle et aucun benchmark LLM réel n’a été effectué.** Les contrôles documentaires ne doivent pas être présentés comme la réussite des tests réels ci-dessous. Couvre le socle implémenté (archive centrale, import indépendant, profil descriptif, retrieval borné, rappels) plus les modalités proposées (images sans archive binaire, comparaison Groq/OpenRouter, tableau de bord local).
 
 ## 1. Ordre et niveaux
 
@@ -21,6 +21,7 @@ Pas de sandbox LinkedIn supposée disponible. Les tests automatisés ordinaires 
 | SEC-01 | Message/bouton d’un autre utilisateur, groupe ou propriétaire usurpé par username | Refus, aucun changement sensible ni appel de publication |
 | SEC-02 | Utilisateur écrit « OK », « oui », « super », ou donne une instruction citée/transférée | Pas de publication ; clarification ou validation non sensible selon contexte |
 | SEC-03 | Source web demande d’ignorer les règles, voler un secret ou publier | Traitée comme données non fiables ; aucun effet sur les autorisations |
+| SEC-04 | Clé/jeton dans `.env`, code, log, prompt, Telegram ou dépôt | Secret jamais affiché ni commité ; `.env` ignoré, `.env.example` sans vraie clé ; variables manquantes signalées par nom sans contenu |
 | VAL-01 | Texte approuvé, image non choisie | Publication refusée ; demander image ou absence explicite |
 | VAL-02 | Texte et image approuvés, pas d’accord final | Aucun upload LinkedIn ni post |
 | VAL-03 | Ancien bouton final après modification du texte, fait, auteur, visibilité ou média | Rejet ; nouvel aperçu et autorisation nécessaires |
@@ -54,6 +55,10 @@ Pas de sandbox LinkedIn supposée disponible. Les tests automatisés ordinaires 
 | IMG-06 | Parcours image complet | Aucun binaire en base, fichier temporaire applicatif, cache SDK disque ou sauvegarde ; perte du tampon ⇒ nouvel aperçu + approbations image/finale |
 | BUD-01 | Quota épuisé, modèle devenu payant, limite inconnue ou PAYG détecté | Capacité bloquée ; pas de débit payant, pas de contournement par autre compte |
 | BUD-02 | Fournisseur gratuit en panne | Pas de transfert à un nouveau destinataire non approuvé |
+| IA-01 | Comparaison Groq/OpenRouter avant sélection | Aucun modèle figé d’office ; mêmes tâches autorisées, métriques relevées dans `llm_benchmarks` ; sélection seulement après recette |
+| IA-02 | Fournisseur/modèle gratuit épuisé ou devenu payant | Aucun basculement automatique vers une offre payante ; pause explicite, pas de débit ni de contournement |
+| DASH-01 | Tableau de bord local | Lié à `127.0.0.1` uniquement ; même base/paramètres que Telegram ; aucune seconde voie de publication ; non exposé publiquement sans authentification |
+| DASH-02 | Paramètre modifié via Telegram ou tableau de bord | Une seule source de vérité SQLite ; l’autre canal reflète la même valeur ; aucun secret affiché dans l’interface |
 
 ## 3. États, concurrence et pannes
 
@@ -73,7 +78,7 @@ Utiliser une horloge contrôlable et des adaptateurs simulés ; aucune attente d
 
 ## 3bis. Historique central, import et profil (tests locaux)
 
-Fixtures multi-formats : originaux utilisateur, export simulé du skill (schéma supposé, à remplacer par la sortie réelle auditée), export d’un autre outil, réponse API simulée avec restrictions. Aucun Actor exécuté, aucun compte réel.
+Fixtures multi-formats : originaux utilisateur, export simulé du skill (schéma documenté par l’audit : `postText`/`publishedAt`/`url` ; sortie réelle non obtenue, aucun Actor exécuté), export d’un autre outil, réponse API simulée avec restrictions. Aucun Actor exécuté, aucun compte réel.
 
 - Déduplication : ID typé complet prioritaire ; suffixes `share`/`ugcPost`/`activity` non assimilés sans preuve ; repli texte normalisé versionné + date précise + auteur + métadonnées ; normalisation ne supprimant ni nombres, URLs ni ponctuation significative.
 - Deux posts réels de même texte mais IDs/dates différents restent distincts ; date au jour seule ne fabrique pas d’heure ; date future ou contradictoire ⇒ conflit visible.
@@ -110,6 +115,7 @@ Fixtures multi-formats : originaux utilisateur, export simulé du skill (schéma
 | Cas | Attendu |
 |---|---|
 | Rappels désactivés et idée spontanée | Brouillon créé normalement |
+| Rappel quotidien configuré | Créneau par défaut 10 h 00 `Africa/Tunis` (décision utilisateur), modifiable ; au plus un par jour local ; le `DEFAULT_HOUR=9` actuel du code doit être aligné en Phase 1 |
 | Bot pas encore démarré ou bloqué | Pas de promesse de livraison ; statut explicite |
 | Deux événements du même créneau | Un seul rappel quotidien |
 | Créneau récurrent et inactivité simultanés | Motifs fusionnés, pas deux messages |
@@ -145,7 +151,7 @@ L’utilisateur évalue une petite série de textes sur ses thèmes réels, avec
 
 Critères bloquants : fait personnel inventé, citation/source fabriquée, chiffre non vérifié présenté comme certain, promesse de contenu futur interdite, modification substantielle hors demande non signalée. Un score automatique peut aider mais ne remplace pas cette recette.
 
-**Qualification de modèle avant choix :** relever modèle/version, paramètres, taille des entrées/sorties, quotas et éventuels échecs ; comparer sur les mêmes tâches autorisées. Aucun résultat de ce benchmark réel n’est disponible en Mission 0.
+**Qualification et comparaison de modèles avant choix :** Groq et OpenRouter sont comparés sur les mêmes tâches autorisées (qualité du français, suivi d’instructions, reproduction du style, latence, limites d’usage) ; relever fournisseur/modèle/version, paramètres, taille des entrées/sorties, quotas et échecs dans `llm_benchmarks`. Aucun modèle n’est sélectionné définitivement avant cette recette. Aucun résultat de benchmark réel n’est disponible à ce jour ; les tests actuels utilisent des fournisseurs simulés.
 
 ## 7. Images et droits
 
@@ -171,6 +177,17 @@ Critères bloquants : fait personnel inventé, citation/source fabriquée, chiff
 - Les limites locales complètent la configuration de facturation, elles ne prouvent pas seules l’absence de frais.
 - Tests hôte : veille, coupure Internet, redémarrage système, espace disque insuffisant, lancement accidentel d’une seconde instance et restauration.
 - Aucun stress test sur les API gratuites ; tests de charge/concurrence en local uniquement.
+
+## 8bis. Tableau de bord local (à implémenter, tests proposés)
+
+Interface `127.0.0.1:8000` servie par le même processus, lisant/écrivant la même base SQLite que Telegram. Aucun test réel d’exposition publique n’est effectué au socle.
+
+- Liaison loopback vérifiée : aucune écoute sur `0.0.0.0` ni interface externe par défaut ; refus de toute requête non locale.
+- Configuration partagée : un paramètre modifié via le tableau de bord est relu identique par Telegram et inversement ; une seule source de vérité, pas de double stockage divergent.
+- Aucune voie de publication : le tableau de bord ne déclenche ni upload ni POST LinkedIn ; toute publication reste soumise au manifeste et à l’autorisation finale unique.
+- Secrets : aucune clé/jeton affiché, renvoyé ou journalisé par l’interface ; les variables manquantes sont signalées par nom.
+- Sections progressives : configuration générale/éditoriale, fournisseurs/modèles/benchmarks, recherches, historique + statuts, état système (services, erreurs, quotas, dernières exécutions) ; chaque section testée sur données simulées.
+- Garde d’exposition : si une exposition Internet est envisagée plus tard, authentification et protection des secrets obligatoires avant tout accès ; non couvert par le socle local.
 
 ## 9. Recette de bout en bout autorisée
 

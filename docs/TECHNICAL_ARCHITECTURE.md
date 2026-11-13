@@ -1,15 +1,17 @@
 # Architecture technique proposée
 
-Date : 13 novembre 2026. **Mission 0.5, conception uniquement.** Python, SQLite central, Telegram principal, n8n facultatif, Tunisie/`Africa/Tunis`, publication officielle, budget 0 €, validations séparées et archive textuelle sans fichiers images sont validés par l’utilisateur. Les contrats, schémas et paramètres ci-dessous restent proposés. Aucun composant n’est implémenté.
+Date : 13 novembre 2026. **Mission 0.6.** Python, SQLite central, Telegram principal, n8n facultatif, Tunisie/`Africa/Tunis`, publication officielle, budget 0 €, validations séparées et archive textuelle sans fichiers images sont validés. Décisions du 13 novembre : hébergement local (PC utilisateur), Groq/OpenRouter à comparer, tableau de bord local planifié, rappel quotidien 10 h modifiable. Le socle local (phases 2–4 + rappels) est implémenté et testé (75 tests, publication simulée) ; les contrats et paramètres ci-dessous restent proposés pour le reste. Aucune intégration authentifiée.
 
 ## 1. Décision de structure
 
 **Un monolithe modulaire Python, un processus actif, une base SQLite locale, un canal Telegram.** Les appels LLM, recherche, historique, images et publication passent par des adaptateurs remplaçables. Un planificateur interne léger crée des événements de rappel ; il n’autorise jamais de publication.
 
 ```text
-Utilisateur <-> Telegram <-> Orchestrateur déterministe
+Utilisateur <-> Telegram <-> Orchestrateur déterministe <-> Tableau de bord local (127.0.0.1)
                                |       |         |
                            Recherche Rédaction Images en RAM
+                                       |
+                          LLMProvider (Groq / OpenRouter à comparer)
                                        |
                       Profil compact + requêtes SQLite ciblées
                                        |
@@ -21,12 +23,14 @@ Utilisateur <-> Telegram <-> Orchestrateur déterministe
                                        |
                      Confirmation fiable -> archive texte SQLite
 
-Originaux utilisateur / skill audité / autre source autorisée
+Originaux utilisateur / export du skill audité / autre source autorisée
   -> adaptateur d'import -> contrôle des droits -> comparaison
   -> aperçu + confirmation -> même archive SQLite versionnée
 
 SQLite : archive + profil + règles + brouillons + registre d'envoi
-Planificateur -> rappels ; garde de quota -> appels fournisseurs
+         + paramètres partagés (Telegram = tableau de bord) + benchmarks LLM
+Planificateur -> rappels (10 h Africa/Tunis, modifiable) ; garde de quota -> fournisseurs
+Secrets : .env local (jamais en base ni logs) ; .env.example factice versionné
 ```
 
 L’historique durable est indépendant d’Apify et du droit de lecture LinkedIn. La capacité de publier ne prouve pas celle de lire, de conserver ou de transférer un post. L’absence de fichiers images est satisfaite par une proposition RAM seule, détaillée plus bas.
@@ -35,7 +39,7 @@ Le LLM propose des intentions et du texte ; l’orchestrateur contrôle leur adm
 
 ### Ce qui n’est pas nécessaire
 
-Ni microservices, ni Redis, ni Celery, ni Kubernetes, ni bus externe, ni Postgres initial, ni base vectorielle, ni interface web permanente, ni second framework agentique. Les interfaces ci-dessous sont des contrats internes, pas des services HTTP séparés. n8n peut être réévalué si l’utilisateur privilégie réellement l’édition visuelle ; il ne doit pas doubler le moteur d’état métier.
+Ni microservices, ni Redis, ni Celery, ni Kubernetes, ni bus externe, ni Postgres initial, ni base vectorielle, ni second framework agentique. Un **tableau de bord web local** est planifié (localhost, même processus/base) ; aucune interface web publique n’est nécessaire au socle. Les interfaces ci-dessous sont des contrats internes ; le tableau de bord est un serveur HTTP local, pas un service métier séparé. n8n peut être réévalué si l’utilisateur privilégie réellement l’édition visuelle ; il ne doit pas doubler le moteur d’état métier.
 
 ## 2. Modules et responsabilités
 
@@ -54,6 +58,8 @@ Ni microservices, ni Redis, ni Celery, ni Kubernetes, ni bus externe, ni Postgre
 | Publication | Préflight, verrou, envoi officiel, preuve de résultat et réconciliation | Recevoir directement une commande du LLM ou répéter un envoi incertain |
 | Stockage/exploitation | Transactions, reprises, purges, sauvegardes, logs expurgés | Conserver les secrets dans la base métier ou les logs |
 | Fournisseurs/quotas | Traduction des contrats internes, plafonds, délais, compteurs | Activer une offre payante ou changer les termes de confidentialité sans accord |
+| Tableau de bord local | Servir configuration/état/historique sur 127.0.0.1, partager la même base SQLite | Exposer publiquement sans protection, publier sans les validations déterministes, stocker des secrets |
+| Comparaison LLM | Exécuter des tâches identiques sur Groq/OpenRouter, mesurer latence/usage, recueillir l’évaluation humaine | Sélectionner un modèle définitivement sans tests, basculer vers du payant |
 
 Les modules sont des frontières de responsabilité dans un seul dépôt et processus, pas une obligation de créer une classe ou un fichier pour chaque ligne.
 
@@ -113,6 +119,8 @@ Les noms sont des contrats de conception, pas des fonctions déjà disponibles. 
 | `LinkedIn.prepare_media` | Compte et image autorisés, consentement de transfert | URN média et niveau de preuve de disponibilité | Aucun post ; transfert après autorisation finale seulement |
 | `LinkedIn.publish` | Manifeste, intention durable liée exclusivement à l’autorisation déjà consommée pour elle, validité temporelle et absence d’envoi antérieur contrôlées | Reçu officiel, échec certain ou résultat incertain | Seul point d’émission d’un post ; ne consomme pas une seconde autorisation et ne rejoue pas une intention envoyée |
 | `Quota.reserve/settle` | Fournisseur, coût maximum estimé, unités, fenêtre | Autorisé ou pause jusqu’à date connue | Réservation atomique avant réseau ; comptabilisation réelle après retour |
+| `Settings.get/set` | Clé de paramètre, valeur typée, acteur autorisé | Valeur effective partagée Telegram/tableau de bord | Écriture transactionnelle ; règles normatives via confirmation séparée |
+| `Benchmark.run` | Tâche de référence, fournisseur/modèle, budget | Texte, latence, usage, références ; évaluation humaine distincte | Aucun choix définitif automatique ; aucun appel payant |
 
 ### Structures communes
 
@@ -130,7 +138,7 @@ SQLite convient à une personne, un hôte, peu d’écritures, et des transactio
 
 | Table | Données nécessaires | Justification et contraintes |
 |---|---|---|
-| `settings` | Propriétaire/chat autorisés, fuseau, rappels, thème, consentements prestataires, références de capacités OAuth sans secrets | Paramètres qui doivent survivre au redémarrage ; un seul profil actif |
+| `settings` | Propriétaire/chat autorisés, fuseau, rappels (10 h par défaut), paramètres éditoriaux progressifs (thèmes, ton, public, longueur, langue, fréquence, horaires, préférences recherche/images, modèle/fournisseur LLM, fournisseur recherche), consentements prestataires, références de capacités OAuth sans secrets | Paramètres partagés Telegram/tableau de bord survivant au redémarrage ; un seul profil actif ; aucune valeur figée arbitrairement |
 | `drafts` | Identifiant, état, révision courante, dates, dernier blocage | Reprise de conversation et contrôle de concurrence |
 | `draft_versions` | Révisions immuables, texte, dossier de recherche compact, manifeste image et empreintes | Prouver ce qui a été approuvé ; unique `(draft_id, revision)` |
 | `approvals` | Type texte/image/absence/final/règle, acteur, référence exacte, date/expiration, consommation | Contrôle explicite et références à usage unique ; pas de transcript complet |
@@ -144,6 +152,7 @@ SQLite convient à une personne, un hôte, peu d’écritures, et des transactio
 | `import_batches` | Origine, empreinte de lot, schéma, plan borné, versions attendues, décisions, état, date d’import | Aperçu/commit reproductibles ; contenu en attente seulement si persistance déjà autorisée |
 | `style_profile` | Synthèse descriptive bornée, thèmes/périodes, confiance/couverture, références versions et usages autorisés, version de calcul | Cache dérivé persistant invalidable ; pas de règle normative implicite |
 | `quota_usage` | Fournisseur, période, unité, usage réservé/consommé, plafond | Redémarrer ne réinitialise pas le budget |
+| `llm_benchmarks` (proposée) | Fournisseur, modèle, tâche de référence, latence, usage, références de sortie, évaluation humaine datée | Comparaison reproductible avant sélection ; aucun secret, aucun choix définitif automatique |
 
 Les snapshots JSON validés restent petits : sources du brouillon, droits d’image, plan de lot et profil. Aucun JSON fournisseur opaque non borné, ni historique de conversation intégral. Les droits sont portés par les observations et les champs correspondants ; les différentes autorisations de stockage/analyse locale/dérivation/Telegram/LLM ne se réduisent pas à un booléen global.
 
@@ -153,7 +162,7 @@ Un index FTS, une empreinte ou un résumé peut aussi être un dérivé soumis �
 
 ### Hors base
 
-- Secrets dans un fichier d’environnement privé ou le coffre du système, permissions minimales. La base contient uniquement une référence, les scopes et la date d’expiration, jamais le jeton.
+- Secrets dans `.env` local (ignoré par git ; `.env.example` factice versionné) ou le coffre du système, permissions minimales. Chargement au démarrage, validation des variables requises par leur nom sans révéler les valeurs ; aucune clé dans le code, les logs, les prompts ou Telegram. La base contient uniquement une référence, les scopes et la date d’expiration, jamais le jeton.
 - Réponses HTML brutes en mémoire ; extraits pertinents seulement dans le dossier de recherche.
 - Images : recommandation **RAM seule** de bout en bout, sans BLOB, fichier temporaire, cache SDK sur disque ni binaire dans les sauvegardes. Métadonnées autorisées, empreinte et preuve de droits seulement en SQLite. Taille compressée, dimensions et mémoire décodée bornées avant traitement.
 - Perte du tampon (arrêt, expiration ou pression mémoire) : invalider image et autorisation finale ; nouveau téléchargement/choix, aperçu et accord. Ne pas reprendre un upload depuis une simple URL mutable. Si le POST a déjà pu partir, conserver le verrou d’incertitude indépendamment de la perte d’image.
@@ -244,13 +253,19 @@ L’effacement local n’efface ni le chat Telegram, ni un post LinkedIn, ni d�
 
 ## 8. Hébergement et exploitation
 
-### Option de départ recommandée
+### Hôte décidé : PC de l’utilisateur (développement et premiers tests)
 
-PC déjà disponible et administré avec accord de son propriétaire. Un compte système dédié, un gestionnaire de service adapté au système, un stockage local privé et une sauvegarde chiffrée sur un emplacement existant suffisent. Un seul consommateur Telegram et un seul worker de publication sont actifs.
+Décision du 13 novembre 2026 : développement et premiers tests sur le PC de l’utilisateur. Un compte système dédié, un gestionnaire de service adapté, un stockage local privé et une sauvegarde chiffrée sur un emplacement existant suffisent. Un seul consommateur Telegram et un seul worker de publication sont actifs. **Aucune installation ni déploiement distant maintenant** ; le développement n’est pas bloqué par le choix d’hébergement définitif.
 
-Long polling Telegram : connexions sortantes, pas de domaine ni webhook public nécessaire. Cela **ne résout pas** le callback OAuth LinkedIn : avant développement, vérifier une redirection autorisée et accessible au navigateur de l’utilisateur. Une configuration locale ponctuelle doit être acceptée par LinkedIn ; sinon prévoir un callback HTTPS temporaire sûr sur l’hôte retenu, sans dépendre d’un tunnel payant ou non vérifié. Aucun mode OAuth de périphérique n’est supposé disponible.
+Oracle Always Free sera **étudié plus tard** (éligibilité, compte, région, capacité réelle, quotas, risque de récupération d’instance inactive) ; le PC d’un ami reste un secours. Aucune architecture ne dépend d’une VM gratuite non obtenue.
 
-Oracle Always Free est une alternative conditionnelle : éligibilité, compte, région, capacité réelle, quotas de disque/réseau et risque de récupération d’instance inactive doivent être validés. Aucune architecture ne doit dépendre d’une VM gratuite non encore obtenue.
+Long polling Telegram : connexions sortantes, pas de domaine ni webhook public nécessaire. Cela **ne résout pas** le callback OAuth LinkedIn : vérifier une redirection autorisée et accessible au navigateur de l’utilisateur. Une configuration locale ponctuelle doit être acceptée par LinkedIn ; sinon prévoir un callback HTTPS temporaire sûr, sans tunnel payant ou non vérifié. Aucun mode OAuth de périphérique n’est supposé disponible.
+
+### Tableau de bord web local (planifié, développement progressif)
+
+Serveur HTTP de la bibliothèque standard lié à **127.0.0.1** (port 8000 proposé), dans le même processus que l’orchestrateur, lisant/écrivant la **même base SQLite** : Telegram et tableau de bord partagent une configuration unique (`settings`), jamais deux sources de vérité. Sections prévues : configuration générale, éditoriale, IA (fournisseurs/modèles/benchmarks), recherches, historique (archive + statuts), état système (services, erreurs, quotas, dernières exécutions). Développement progressif : configuration + état système en Phase 1, éditorial/IA/recherches en Phase 5, état système complet en Phase 8.
+
+Garde-fous : aucune exposition publique au socle ; **si l’interface est exposée ultérieurement sur Internet, authentification et protection des secrets obligatoires** avant toute accessibilité. Le tableau de bord ne crée pas de second chemin de publication : toute publication passe par les mêmes validations déterministes (texte/image/finale) et le même registre d’intentions. Les écritures de configuration sont transactionnelles et visibles des deux interfaces ; aucun secret n’est affiché ni stocké en base.
 
 ### Exploitation minimale
 

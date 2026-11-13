@@ -1,10 +1,10 @@
 # Exigences produit — LinkedIn AI Assistant
 
-Date : 13 novembre 2026. **Mission 0.5 documentaire.** Implémentation autorisée par l’utilisateur le 13 novembre 2026 ; aucune intégration testée ; aucune action sur un compte/service sans autorisation distincte.
+Date : 13 novembre 2026. **Mission 0.6.** Phases 2 à 4 et rappels locaux implémentés (75 tests sans réseau, publication simulée) ; décisions utilisateur du 13 novembre intégrées. Aucune intégration authentifiée testée ; aucune action sur un compte/service sans autorisation distincte ; périmètre de la Phase 1 révisée à valider avant de poursuivre le codage.
 
 **Validé par l’utilisateur :** Python + SQLite, modularité et fournisseurs interchangeables, Telegram comme interface principale, n8n facultatif, utilisation en Tunisie avec fuseau `Africa/Tunis`, publication par API officielle LinkedIn, budget 0 € sans paiement obligatoire ni fallback payant, validations texte et image distinctes puis autorisation finale, archive centrale durable de tous les textes dont la rétention est permise et profil compact persistant, sans archive de fichiers images.
 
-**Encore proposés ou à vérifier :** modalités techniques détaillées, hôte, fournisseurs/modèles, accès et scopes réels, conditions/consentements par usage et destination, paramètres de rétention, d’import, de retrieval et de rappels. Ces modalités restent à confirmer ; leur validation ne vaut pas autorisation d’action externe.
+**Décisions du 13 novembre 2026 :** hébergement sur le PC utilisateur (dev/tests), Oracle à étudier plus tard, PC ami en secours ; LLM Groq + OpenRouter à comparer, aucun modèle figé avant tests, clés via `.env` ; tableau de bord web local planifié (même configuration SQLite que Telegram) ; rappel quotidien 10 h `Africa/Tunis` modifiable ; paramètres éditoriaux progressifs configurables ; skill Apify audité. **Encore proposés ou à vérifier :** accès/scopes LinkedIn réels (application existante à vérifier au portail), conditions/consentements par usage et destination, paramètres de rétention, d’import, de retrieval, seuil d’inactivité 120 h. Leur validation ne vaut pas autorisation d’action externe.
 
 ## 1. Objectif et périmètre
 
@@ -18,12 +18,14 @@ Les quotas gratuits ne constituent pas une garantie de disponibilité ou de grat
 - Archive centrale durable de **tous les textes dont la rétention est permise** : source A, publications du bot confirmées ; source B, imports autorisés indépendants du fournisseur. Trois publications récentes constituent un échantillon de consultation, pas une limite de stockage.
 - Profil de style compact persistant, descriptif et recalculable, distinct des règles normatives confirmées ; sélection bornée de textes pertinents, jamais toute l’archive envoyée à chaque génération.
 - Images existantes, droits vérifiés, validation séparée, aucune archive de fichiers images ; texte seul possible uniquement après choix explicite.
-- Rappels facultatifs en `Africa/Tunis` ; publication immédiate après autorisation finale via API officielle.
+- Rappels facultatifs en `Africa/Tunis` (quotidien 10 h par défaut, modifiable) ; publication immédiate après autorisation finale via API officielle.
+- Comparaison de modèles LLM Groq/OpenRouter avant sélection définitive ; paramètres éditoriaux progressifs configurables (thèmes, ton, public, longueur, langue, fréquence, horaires, préférences recherche/images, modèle/fournisseur).
+- Tableau de bord web local (localhost) : configuration générale, éditoriale, IA/benchmarks, recherches, historique, état système ; même configuration SQLite que Telegram ; jamais exposé publiquement sans protection.
 - Reprise après redémarrage, brouillons/révisions, historique opérationnel minimal, archive autorisée distincte, prévention des doublons et visibilité des erreurs. Un tampon image perdu nécessite un nouvel aperçu et de nouvelles approbations image/finale.
 
 ### Exclus du premier produit
 
-Multi-utilisateur, pages d’entreprise, réponses/commentaires/likes automatisés, prospection, scraping LinkedIn intégré, planification de publications sans présence de l’utilisateur, analytics d’engagement, vidéo, carrousel, interface web permanente, base vectorielle, archive binaire d’images, agent autonome disposant des jetons de publication. Un import externe éventuel n’autorise ni collecte non conforme ni exécution/modification du skill Apify. La génération d’images reste une extension facultative désactivée tant qu’une option compatible n’est pas démontrée.
+Multi-utilisateur, pages d’entreprise, réponses/commentaires/likes automatisés, prospection, scraping LinkedIn intégré, planification de publications sans présence de l’utilisateur, analytics d’engagement, vidéo, carrousel, **interface web exposée publiquement sans protection** (le tableau de bord local est inclus, planifié), base vectorielle, archive binaire d’images, agent autonome disposant des jetons de publication. Un import externe éventuel n’autorise ni collecte non conforme ni exécution/modification du skill Apify. La génération d’images reste une extension facultative désactivée tant qu’une option compatible n’est pas démontrée.
 
 ## 2. Parcours de référence
 
@@ -48,7 +50,7 @@ Critères de recette futurs, non exécutés. Les seuils et modalités signalés 
 | CONV-02 | Idées à tout moment, indépendamment des rappels | Réception Telegram, brouillons | Rappels désactivés : une idée spontanée démarre un brouillon |
 | CONV-03 | Désambiguïsation et corrections en langage naturel | Routeur, contexte de brouillon | « Raccourcis le deuxième paragraphe » ne réécrit pas silencieusement tout le post ; « OK » ne publie pas |
 | CONV-04 | Résilience et statut | Persistance, quota | Redémarrer conserve brouillon textuel et statut ; `/statut` expose attente, blocage ou prochaine action ; tampon image perdu = revalidation |
-| REM-01 | Fuseau fixé, paramètres de rappel proposés | Horloge `Africa/Tunis`, planificateur | Heure/jours/activation affichés et confirmés avant activation ; ne pas redemander le fuseau validé |
+| REM-01 | Fuseau fixé, rappel quotidien 10 h modifiable | Horloge `Africa/Tunis`, planificateur | Défaut 10 h 00 choisi par l’utilisateur, modifiable ; jours/activation affichés et confirmés ; ne pas redemander le fuseau validé |
 | REM-02 | Seuil proposé de cinq jours | Date acceptée, planificateur | Si 120 h validées : prochain créneau autorisé, au plus 1 rappel/jour local, motifs fusionnés et reprise sans rafale ; `imported_at` ne remet jamais le compteur à zéro |
 | REM-03 | Pause sans désactiver le bot | Paramètres indépendants | Désactiver les rappels n’arrête ni les idées ni les corrections ni la publication manuelle |
 | REM-04 | Dates fiables et incertitudes visibles | `published_at`, précision/fuseau | Date imprécise/future/en conflit = clarification ; sans heure serveur, `confirmed_at` du bot seulement comme approximation explicitement signalée |
@@ -84,10 +86,14 @@ Critères de recette futurs, non exécutés. Les seuils et modalités signalés 
 | PUB-04 | État incertain visible | Réconciliation explicite | Timeout après envoi possible : verrou du compte et zéro retry automatique ; import/déclaration ne lèvent pas automatiquement `UNKNOWN_OUTCOME` |
 | OPS-01 | Dépense nulle par construction | Garde de quota, offres gratuites à vérifier | Quota épuisé ou offre ambiguë : arrêt de la capacité, aucun paiement obligatoire ni fallback payant |
 | OPS-02 | Remplacement des fournisseurs | Contrats internes | Un changement de LLM/recherche/import ne modifie pas la logique d’approbation ou la base métier |
+| IA-01 | Comparaison avant sélection | Groq + OpenRouter, harness | Modèles comparés sur tâches identiques (français, instructions, style, latence, limites) ; aucun modèle figé avant tests ; changement sans toucher au métier |
+| IA-02 | Aucun payant automatique | Garde de quota, paramètres | Aucun fournisseur payant sans autorisation ; aucun basculement automatique vers une offre payante ; quota épuisé = arrêt |
+| SEC-01 | Secrets locaux | `.env` ignoré par git, `.env.example` factice | Aucune clé dans le code/logs/prompts/Telegram ; variables manquantes signalées par nom au démarrage sans révéler leur contenu ; jamais de clé demandée dans la conversation |
+| DASH-01 | Tableau de bord local | Serveur loopback, SQLite partagé | Lié à 127.0.0.1 ; même configuration que Telegram ; pas de second chemin de publication ; jamais public sans authentification et protection des secrets |
 
 ## 4. Règles de rappel proposées
 
-- Le fuseau **`Africa/Tunis` est validé**, pas à redemander. Activation, heure et jours restent à choisir ; proposition de laisser les rappels désactivés tant que ces paramètres et le consentement ne sont pas confirmés. Le bot fonctionne indépendamment des rappels.
+- Le fuseau **`Africa/Tunis` est validé**, pas à redemander. L’utilisateur a choisi un **rappel quotidien à 10 h 00**, modifiable ; jours et activation restent configurables. Proposition de laisser les rappels désactivés tant que le consentement n’est pas confirmé. Le bot fonctionne indépendamment des rappels.
 - Deux motifs proposés : créneau éditorial récurrent et inactivité de cinq jours. Au plus **un rappel par jour local**, motifs fusionnés si nécessaire.
 - « Cinq jours » signifie dans la proposition **120 heures écoulées**, puis prochain créneau autorisé ; seuil encore à valider, ni règle déjà acceptée ni limite d’API.
 - Référence : dernier **`published_at` accepté**, avec provenance, précision et fuseau, pour une publication confirmée du bot ou un post externe importé/déclaré et validé. **Jamais `imported_at`** : importer aujourd’hui un ancien post ne remet pas l’inactivité à zéro. Brouillon, intention, échec ou `UNKNOWN_OUTCOME` ne comptent pas comme succès.
@@ -127,7 +133,7 @@ Le profil compact persistant est distinct de l’archive et des règles normativ
 
 ### 6.3. Source B — import indépendant du fournisseur
 
-Le contrat d’import est indépendant d’Apify : des copies ou exports autorisés peuvent l’alimenter, sans prétendre à une synchronisation ni à une collecte autorisée par défaut. Le **skill Apify exact n’est pas fourni et n’a pas été audité**. Ne pas invoquer un skill générique à sa place. Avant toute intégration, examiner ses fichiers, instructions, dépendances, Actor(s) exact(s), entrées/sorties anonymisées, ainsi que ses accès, coûts et conditions. Les adaptations restent **des propositions** ; le skill original demeure inchangé, sans exécution pendant cette mission.
+Le contrat d’import est indépendant d’Apify : des copies ou exports autorisés peuvent l’alimenter, sans prétendre à une synchronisation ni à une collecte autorisée par défaut. Le **skill Apify a été audité le 13 novembre 2026** (lecture seule ; voir [APIFY_SKILL_AUDIT.md](APIFY_SKILL_AUDIT.md)) : skill d’agent pilotant le CLI Apify, Actors LinkedIn community/PPE, scraping non conforme par défaut. Le skill original demeure inchangé, sans exécution. Modes d’intégration par préférence : export utilisateur → importeur générique (implémenté) ; adaptateur de traduction après droits et accord (Phase 3B optionnelle) ; règles d’analyse conformes sans collecte. La collecte LinkedIn par scraping reste hors socle.
 
 Pipeline proposé, avec garde-fous obligatoires :
 
@@ -194,12 +200,13 @@ RAM seule ne promet **ni absence de swap OS/copies système, ni suppression des 
 
 ## 8. Décisions encore ouvertes
 
-Déjà validés : Python + SQLite, Telegram principal/n8n facultatif, Tunisie/`Africa/Tunis`, API officielle, 0 € sans fallback payant, validations séparées puis finale, modularité, archive textuelle sans fichiers images. Restent à décider :
+Déjà validés : Python + SQLite, Telegram principal/n8n facultatif, Tunisie/`Africa/Tunis`, API officielle, 0 € sans fallback payant, validations séparées puis finale, modularité, archive textuelle sans fichiers images. Décisions du 13 novembre 2026 : hébergement local (PC utilisateur, Oracle plus tard, ami secours), Groq + OpenRouter à comparer, tableau de bord local, rappel quotidien 10 h modifiable, skill Apify audité. Restent à décider :
 
-1. Hôte, administrateur, interruptions et coûts indirects acceptés.
-2. Fournisseurs/modèles/offres réellement accessibles, conditions de données et consentements par usage/destination (Telegram inclus) ; produits/scopes/callback LinkedIn et preuves d’accès.
-3. Fichiers/instructions/dépendances/Actors et I/O anonymisées du skill Apify exact ; origine et droits des imports, limites de parsing, modalités d’accord lot/éléments. Aucun secret dans le chat.
-4. Paramètres proposés : rétention par origine, purge brouillons 30 j, lots en attente 7 j, RAM seule pour images, retrieval 6 posts/12 000 caractères, profil 4 000 caractères, expiration finale 10 min, seuil 120 h, heure/jours des rappels.
-5. Thèmes, public, ton, exclusions et recette éditoriale ; confirmation séparée de chaque règle normative permanente.
+1. Application LinkedIn existante à vérifier au portail (aucune trouvée en local) ; produits/scopes/callback et preuves d’accès ; ne rien créer avant vérification.
+2. Clés `.env` fournies par l’utilisateur ; conditions de données et consentements par usage/destination (Telegram inclus) ; modèle définitif après comparaison.
+3. Origine et droits des imports, limites de parsing, modalités d’accord lot/éléments (audit Apify fait). Aucun secret dans le chat.
+4. Paramètres proposés : rétention par origine, purge brouillons 30 j, lots en attente 7 j, RAM seule pour images, retrieval 6 posts/12 000 caractères, profil 4 000 caractères, expiration finale 10 min, seuil 120 h, jours des rappels.
+5. Thèmes, public, ton, longueur, langue, exclusions et recette éditoriale (progressifs, configurables) ; confirmation séparée de chaque règle normative permanente.
+6. Validation du périmètre de la Phase 1 révisée avant de poursuivre le codage.
 
 Les vérifications de comptes et les blocages précis sont suivis dans [API_INTEGRATIONS.md](API_INTEGRATIONS.md) ; l’ordre d’autorisation et de développement est fixé dans [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md).

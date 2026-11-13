@@ -2,7 +2,7 @@
 
 Assistant personnel pour rechercher, rédiger, corriger et publier du contenu LinkedIn depuis Telegram, **uniquement après validations explicites**.
 
-**Statut au 13 novembre 2026 : phases 2 à 4 et rappels locaux implémentés (socle conversationnel, archive centrale, import générique, profil descriptif, retrieval borné, rappels `Africa/Tunis` et déclaration `/lastpost`) — 75 tests sans réseau, publication simulée. Aucun bot/compte créé, aucune intégration authentifiée ni publication réelle. Dépôt privé : github.com/MaherAbderrahim/linkedin-ai-assistant.**
+**Statut au 13 novembre 2026 (Mission 0.6) : phases 2 à 4 et rappels locaux implémentés (socle conversationnel, archive centrale, import générique, profil descriptif, retrieval borné, rappels `Africa/Tunis` et déclaration `/lastpost`) — 75 tests sans réseau, publication simulée. Décisions utilisateur intégrées : hébergement local, comparaison Groq/OpenRouter, tableau de bord local planifié, rappel quotidien 10 h. Skill Apify audité. Aucun bot/compte créé, aucune intégration authentifiée ni publication réelle. Phase 1 révisée : périmètre à valider avant de coder. Dépôt privé : github.com/MaherAbderrahim/linkedin-ai-assistant.**
 
 ## Architecture : décisions validées et propositions
 
@@ -13,12 +13,15 @@ Assistant personnel pour rechercher, rédiger, corriger et publier du contenu Li
 - **Profil descriptif recalculable et référencé**, sans inférence sensible ; textes assistant identifiés, aucune règle normative permanente sans confirmation séparée du texte exact. Retrieval proposé : filtres SQLite + FTS5 si disponible, échantillons récents/thématiques/par période, au plus **6 posts / 12 000 caractères cumulés**, profil **4 000 caractères** ; règles confirmées séparées, jamais tronquées silencieusement. Pas d’envoi de toute l’archive à chaque génération.
 - **Aucune archive binaire d’images.** RAM seule de bout en bout proposée, sans BLOB, disque temporaire ni sauvegarde ; seules métadonnées/empreintes/droits autorisés sont persistables. Perte du tampon ou redémarrage : nouvel aperçu, nouvelles approbations image et finale ; aucune suppression Telegram/LinkedIn ni absence de swap OS promise.
 - **API officielle LinkedIn validée en principe**, `/rest/posts` visée sous réserve d’accès réel ; validations **texte + image/absence distinctes + aperçu exact + autorisation finale à usage unique**. Le LLM ne peut ni autoriser ni déclencher une publication.
-- **Proposés, non intégrés :** processus unique, Telegram long polling ; Groq Free/modèle à qualifier, Tavily Free basic + extraction HTTP/Trafilatura, Wikimedia Commons avec droits vérifiés ; génération d’images désactivée. Recherche bornée à **3 requêtes / 5 pages par tour**.
-- **Hôte à choisir :** machine existante de confiance, ou Oracle Always Free conditionnel. Rappels facultatifs en `Africa/Tunis` : activation/heure/jours et seuil **120 h proposés** ; date de publication acceptée, jamais date d’import, au plus un rappel/jour, fusion et reprise sans rafale. Le bot fonctionne sans rappels.
+- **Décisions du 13 novembre 2026 :** hébergement sur le **PC de l’utilisateur** pour le développement et les premiers tests (Oracle Always Free à étudier plus tard, PC ami en secours ; aucune installation distante maintenant, développement non bloqué). LLM **Groq + OpenRouter à comparer** (qualité du français, suivi des instructions, reproduction du style, latence, limites), aucun modèle figé avant tests comparatifs, clés fournies par l’utilisateur via `.env`. **Tableau de bord web local** planifié (localhost, même configuration SQLite que Telegram, jamais exposé publiquement sans protection). **Rappel quotidien à 10 h 00 `Africa/Tunis`, modifiable** ; paramètres éditoriaux progressifs configurables.
+- **Proposés, non intégrés :** processus unique, Telegram long polling (implémentés localement) ; Tavily Free basic + extraction HTTP/Trafilatura, Wikimedia Commons avec droits vérifiés ; génération d’images désactivée. Recherche bornée à **3 requêtes / 5 pages par tour**.
+- **Rappels facultatifs en `Africa/Tunis` :** heure 10 h 00 choisie, jours/activation et seuil **120 h proposés** ; date de publication acceptée, jamais date d’import, au plus un rappel/jour, fusion et reprise sans rafale. Le bot fonctionne sans rappels.
 
 ## Faisabilité et limites honnêtes
 
 **0 € et aucun paiement obligatoire ni fallback payant** : quota gratuit épuisé ou conditions ambiguës, arrêt de la capacité concernée. Aucun accès de compte, SLA ou gratuité perpétuelle présumé ; matériel, Internet et électricité de l’hôte restent à prendre en charge explicitement.
+
+**Vérification de l’existant (13 novembre 2026) : aucune intégration LinkedIn antérieure n’a été trouvée dans l’espace de travail** — uniquement des scrapers d’offres d’emploi publics (`_work/`), sans rapport avec la publication, aucune application Developer, aucun `client_id`/secret/jeton. La « méthode précédente » n’existe que dans la documentation. La publication personnelle via `w_member_social` + OpenID Connect ne requiert pas intrinsèquement de page entreprise (l’association de Page vise « certaines fonctionnalités et certains produits »), mais **toute intégration OAuth officielle exige une application Developer** (`client_id`). Vérifier le portail développeur pour une application existante avant toute création ; ne rien contourner. L’interface de publication est abstraite et remplaçable, avec simulateur en place jusqu’à l’accès réel.
 
 La publication personnelle via `w_member_social` est documentée, pas attestée pour un compte :
 
@@ -28,13 +31,13 @@ La publication personnelle via `w_member_social` est documentée, pas attestée 
 
 **Conformité par origine et usage :** vérifier séparément stockage, analyse, dérivation et transfert vers chaque destination, **Telegram compris**. La règle des **48 h des Marketing APIs vise l’activité sociale issue de ces APIs**, pas tous les originaux ou imports Apify. Un export conserve son origine API ; le consentement ne neutralise pas les conditions. Droits inconnus : aucune persistance provisoire. Restrictions plus strictes et effacements requis/demandés se propagent aux versions, dérivés, index et profil ; la purge proposée des brouillons à 30 jours n’efface pas l’archive autorisée. Conditions tunisiennes et transferts restent non vérifiés.
 
-Le **skill Apify exact n’est pas fourni ni audité** : ne pas lui substituer un skill générique et ne pas l’invoquer. Examiner d’abord fichiers, instructions, dépendances, Actor(s) exact(s) et entrées/sorties anonymisées, puis accès/coûts/droits. Adaptations seulement proposées, original inchangé ; aucune collecte ou publication non conforme.
+Le **skill Apify a été audité le 13 novembre 2026** (lecture seule de ses fichiers ; voir [APIFY_SKILL_AUDIT.md](docs/APIFY_SKILL_AUDIT.md)) : skill d’agent pilotant le CLI Apify, Actors LinkedIn tous community/PPE, scraping bloqué à grande échelle et non conforme par défaut. Original inchangé, aucune exécution. Réutilisation pour l’archive via l’**import générique** (export utilisateur préféré, adaptateur optionnel après droits et accord) ; jamais une dépendance du cœur ni un moyen de publication.
 
 ## Documents de référence
 
 | Fichier | Contenu |
 |---|---|
-| [README.md](README.md) | Synthèse Mission 0.5, statut et décisions ouvertes |
+| [README.md](README.md) | Synthèse Mission 0.6, statut et décisions |
 | [AGENTS.md](AGENTS.md) | Consignes pour les prochaines sessions, règles non négociables et index |
 | [PRODUCT_REQUIREMENTS.md](docs/PRODUCT_REQUIREMENTS.md) | Besoin complet, périmètre, parcours, exigences et critères d’acceptation |
 | [TECHNICAL_ARCHITECTURE.md](docs/TECHNICAL_ARCHITECTURE.md) | Modules, interfaces, états, validations, données, conservation et exploitation |
@@ -43,15 +46,16 @@ Le **skill Apify exact n’est pas fourni ni audité** : ne pas lui substituer u
 | [API_INTEGRATIONS.md](docs/API_INTEGRATIONS.md) | Capacités documentées vs accès non testés, OAuth, endpoints, limites et sources LinkedIn |
 | [FREE_SERVICES_BENCHMARK.md](docs/FREE_SERVICES_BENCHMARK.md) | Comparaison documentaire datée, quotas, pays, confidentialité, cartes et frais possibles |
 | [TEST_STRATEGY.md](docs/TEST_STRATEGY.md) | Tests futurs, invariants de sécurité, pannes, recette humaine et preuves attendues |
+| [APIFY_SKILL_AUDIT.md](docs/APIFY_SKILL_AUDIT.md) | Audit du skill Apify : fonctionnement, Actors, coûts, limites, conformité, intégration |
 
-Les neuf documents sont liés ci-dessus. Code : `src/linkedin_assistant/` (bibliothèque standard uniquement), tests dans `tests/`. Installation locale : `python -m venv .venv` puis `.venv/Scripts/python -m pip install -e ".[dev]"` ; tests : `.venv/Scripts/python -m pytest -q` ; démarrage : `.venv/Scripts/linkedin-assistant --config config.toml` (mode simulation sans jeton, voir `config.example.toml`) ; test interactif sans réseau : ajouter `--local`.
+Les documents de spécification sont liés ci-dessus. Code : `src/linkedin_assistant/` (bibliothèque standard uniquement), tests dans `tests/`. Installation locale : `python -m venv .venv` puis `.venv/Scripts/python -m pip install -e ".[dev]"` ; tests : `.venv/Scripts/python -m pytest -q` ; démarrage : `.venv/Scripts/linkedin-assistant --config config.toml` (mode simulation sans jeton, voir `config.example.toml`) ; test interactif sans réseau : ajouter `--local`. Secrets : copier `.env.example` vers `.env` (ignoré par git) et renseigner vos clés en local ; ne jamais les coller dans le chat ni les logger.
 
 ## Risques et blocages prioritaires
 
 | Risque | Effet | Réponse proposée |
 |---|---|---|
-| Scopes/endpoint/OAuth non attestés | Publication ou renouvellement indisponibles | Preuves d’accès à obtenir séparément ; aucun compte présumé accessible, aucun contournement |
-| Historique incomplet, skill exact manquant | Couverture du style et rappels incertains | Import indépendant après audit/droits/aperçu/accord ; dates et couverture visibles, jamais trois posts comme plafond |
+| Application/scopes/OAuth non attestés (aucune app trouvée en local) | Publication ou renouvellement indisponibles | Vérifier le portail pour une app existante avant toute création ; preuves d’accès séparées ; aucun contournement |
+| Historique incomplet | Couverture du style et rappels incertains | Import indépendant après droits/aperçu/accord (skill Apify audité) ; dates et couverture visibles, jamais trois posts comme plafond |
 | Doublons, versions ou dates ambiguës | Fusion erronée ou mauvais rappel | ID typé prioritaire, repli conservateur texte + date précise/auteur/métadonnées ; arbitrage humain, pas de suppression silencieuse ni de null écrasant une valeur connue |
 | Droits/transferts/conditions tunisiennes non vérifiés | Stockage ou destination interdits | Vérifier chaque usage/destination, refus sans droits, effacement propagé ; consentement insuffisant à lever une interdiction |
 | Image non qualifiée ou tampon perdu | Autorisation image devenue inutilisable | Preuve image séparée ; nouvel aperçu et approbations image/finale, texte seul uniquement par choix explicite |
@@ -60,15 +64,14 @@ Les neuf documents sont liés ci-dessus. Code : `src/linkedin_assistant/` (bibli
 
 ## Décisions encore ouvertes avant développement
 
-Le socle Python/SQLite, le pays Tunisie et le fuseau `Africa/Tunis` sont déjà validés. Restent à décider ou à fournir :
+Résolus le 13 novembre 2026 : hébergement (PC utilisateur pour dev/tests, Oracle à étudier plus tard, ami en secours), fournisseurs LLM (Groq + OpenRouter à comparer, clés via `.env`), tableau de bord local planifié, rappel quotidien 10 h modifiable, audit du skill Apify. Restent à décider ou à fournir :
 
-1. **Hôte** : machine/administrateur, interruptions acceptées, coûts indirects, sécurité et sauvegarde des données autorisées.
-2. **Fournisseurs et permissions** : modèles/offres réellement 0 €, restrictions tunisiennes et transferts, endpoints/scopes/OAuth texte et image ; éléments de preuve sans secret, aucun accès ou test autorisé par cette liste.
-3. **Skill Apify exact** : fichiers/instructions/dépendances, Actor(s) et I/O anonymisées ; format des imports, origine réelle, droits, limites de parsing et modalités d’accord lot/éléments. Audit documentaire avant toute proposition d’adaptation ; original inchangé.
-4. **Consentements et paramètres de données** : droits séparés stockage/analyse/dérivation/transfert par destination ; rétentions par origine, purge des brouillons proposée à 30 j sans toucher l’archive autorisée, suppression des dérivés, RAM seule pour images ; seuils retrieval 6 posts/12 000 caractères et profil 4 000 caractères proposés.
-5. **Préférences éditoriales** : thèmes, public, ton, exclusions ; confirmation séparée de toute règle normative permanente.
-6. **Rappels facultatifs** : activation, heure/jours et seuil 120 h proposés en `Africa/Tunis` ; dates de publication acceptées, clarification des dates imprécises/futures/en conflit ; `confirmed_at` du bot seulement comme approximation signalée sans heure serveur.
+1. **Application LinkedIn** : vérifier au portail développeur si une application existe déjà (aucune trouvée en local) ; produits/scopes visibles, callback OAuth réellement utilisable, identité et scopes vérifiés sans publier. Une page entreprise n’est pas intrinsèquement requise pour la publication personnelle ; ne rien créer avant vérification.
+2. **Clés et consentements** : l’utilisateur crée le `.env` local (Groq, OpenRouter, Telegram, recherche) ; droits séparés stockage/analyse/dérivation/transfert par destination (Telegram inclus) ; restrictions tunisiennes et transferts à vérifier.
+3. **Paramètres de données** : rétentions par origine, purge des brouillons proposée à 30 j sans toucher l’archive autorisée, RAM seule pour images ; seuils retrieval 6 posts/12 000 caractères et profil 4 000 caractères proposés ; seuil d’inactivité 120 h proposé.
+4. **Préférences éditoriales progressives** : thèmes, public, ton, longueur, langue, exclusions, fréquence/horaires, préférences recherche/images, modèle LLM et fournisseur recherche — configurables (Telegram + tableau de bord, même SQLite), sans figer arbitrairement ; confirmation séparée de toute règle normative permanente.
+5. **Validation du périmètre de la Phase 1 révisée** avant de poursuivre le codage (voir [feuille de route](docs/DEVELOPMENT_ROADMAP.md)).
 
 ## Prochaine étape
 
-L’utilisateur a autorisé le démarrage de l’implémentation (13 novembre 2026) : socle local d’abord (phases 2 à 4 de la feuille de route, adaptateurs simulés, aucun compte réel), puis les capacités externes après validation des décisions ouvertes et autorisation distincte de chaque action. Tout futur test de publication exigera une autorisation séparée sur le contenu exact ; aucune condition inconnue n’est réputée satisfaite. Le skill Apify original reste inchangé tant que ses fichiers n’ont pas été fournis et audités.
+Les phases 2 à 4 et le cœur local des rappels sont livrés (75 tests, publication simulée). Prochaine étape : **valider le périmètre de la Phase 1 révisée** (configuration `.env` + validation au démarrage, paramètres progressifs partagés Telegram/tableau de bord, rappel 10 h, abstraction LLM Groq/OpenRouter + harness de comparaison, squelette du tableau de bord local, vérification de l’application LinkedIn existante) avant de coder. Aucune implémentation complète ni déploiement tant que ce périmètre n’est pas validé ; chaque action externe exige une autorisation distincte sur le contenu exact. Le skill Apify original reste inchangé.

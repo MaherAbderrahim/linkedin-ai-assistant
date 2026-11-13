@@ -1,6 +1,6 @@
 # Comparatif documentaire des services gratuits
 
-**Vérifié documentairement le 13 novembre 2026 (Mission 0), complété en Mission 0.5 pour l’archive centrale, l’import et le profil.** Il ne s’agit pas d’un benchmark de performance ni d’un test des comptes de l’utilisateur. Aucun compte créé, aucune clé utilisée, aucun appel API authentifié, aucune mesure de qualité/latence réelle. Les offres peuvent changer ; les accès et quotas doivent être recontrôlés avant activation.
+**Vérifié documentairement le 13 novembre 2026 (Mission 0), complété en Missions 0.5 et 0.6 (archive centrale, import, profil, décisions utilisateur, audit du skill Apify).** Il ne s’agit pas d’un benchmark de performance ni d’un test des comptes de l’utilisateur. Aucun compte créé, aucune clé utilisée, aucun appel API authentifié, aucune mesure de qualité/latence réelle. Les offres peuvent changer ; les accès et quotas doivent être recontrôlés avant activation.
 
 **Limite de revalidation Mission 0.5 :** les chiffres tarifaires ci-dessous sont les preuves datées de Mission 0, pas une revérification intégrale. Les pages conditions Apify, abonnements et stockage n’ont pas pu être rouvertes pendant la mise à jour ; leurs valeurs restent des preuves Mission 0 à recontrôler avant tout usage. Les conditions tunisiennes de protection des données/transferts ne sont pas vérifiées par ce document.
 
@@ -20,19 +20,19 @@
 |---|---|---|---|---|
 | Orchestration | Python, processus unique | n8n Community Edition | Un peu de code métier sera nécessaire ; pas d’hébergement inclus | Les adaptateurs et états restent indépendants |
 | Persistance | SQLite central : archive textuelle autorisée, profil compact, brouillons, registre d’envoi | PostgreSQL si besoin réel ; pas de base vectorielle | Un seul hôte/écrivain métier ; pas de stockage réseau partagé ; aucun binaire image | Frontière de stockage interne |
-| Historique/import | Import générique : originaux utilisateur, export du skill audité, autre source conforme | Lecture officielle si scope et conditions obtenus | Droits par origine/usage/destination avant persistance ; skill exact non fourni/non audité | Contrat ImportProvider indépendant d’Apify |
+| Historique/import | Import générique : originaux utilisateur, export du skill audité, autre source conforme | Lecture officielle si scope et conditions obtenus | Droits par origine/usage/destination avant persistance ; skill audité le 13 nov (voir APIFY_SKILL_AUDIT.md) | Contrat ImportProvider indépendant d’Apify |
 | Conversation | Telegram Bot API | WhatsApp Cloud API pour certains usages réactifs | Bot démarré par utilisateur ; chat non chiffré de bout en bout | Adaptateur conversation |
-| Rédaction | Groq Free candidat prioritaire, modèle à qualifier | Gemini Free sous contraintes, Workers AI, OpenRouter `:free` | Aucun modèle/qualité/quota spécifique validé ; traitement de données à approuver | Contrat LLMProvider |
+| Rédaction | Groq + OpenRouter à comparer (décision utilisateur), modèle non figé | Gemini Free sous contraintes, Workers AI | Comparaison avant sélection ; aucun payant automatique ; traitement de données à approuver | Contrat LLMProvider |
 | Recherche web | Tavily Free `basic` | Brave Search avec prépayé 0 $, liens utilisateur/RSS sélectionnés | 1 000 crédits mensuels ; pas de PAYG | Contrat SearchProvider |
 | Extraction | HTTP contrôlé + Trafilatura | Extraits autorisés fournis par l’utilisateur | Pages HTML publiques ; JavaScript, paywalls et protections non contournés | Contrat Extractor |
 | Images | Wikimedia Commons, sélection prudente, octets en RAM (proposé) | Pexels après revue des conditions ; image fournie par utilisateur | Licence par fichier ; aucune archive binaire de fichiers images | Contrat ImageProvider |
 | Publication | API officielle LinkedIn | Aucune alternative automatisée retenue | Accès application, OAuth, version et endpoint à éprouver | Adaptateur unique, toujours officiel |
-| Hébergement | Machine existante de confiance | Oracle Always Free sous réserve d’éligibilité/capacité | Coûts d’électricité et disponibilité à accepter | Même application, base et sauvegarde migrables |
+| Hébergement | PC utilisateur (dev/tests, décidé) | Oracle Always Free à étudier plus tard ; PC ami en secours | Coûts d’électricité et disponibilité à accepter ; aucune installation distante maintenant | Même application, base et sauvegarde migrables |
 | Génération d’images | Désactivée | Service futur réellement gratuit ou image personnelle | Aucune offre gratuite récurrente compatible démontrée | Extension facultative hors chemin critique |
 
 ## 3. LLM hébergés
 
-### Groq Free — candidat de départ, pas sélection définitive du modèle
+### Groq Free — co-candidat avec OpenRouter, pas de sélection définitive du modèle
 
 **Pourquoi :** API hébergée, offre Free distincte de Developer, contrôles explicites de conservation, absence de modèle local requis. La qualité rédactionnelle française et les capacités de sortie structurée doivent être testées sur le modèle réellement accessible.
 
@@ -44,7 +44,7 @@
 - Les données client conservées sont annoncées dans des buckets GCP aux États-Unis. Le document de conservation ne suffit pas, seul, à inventer une garantie contractuelle générale de non-entraînement : examiner les conditions en vigueur avant d’envoyer des exemples personnels.
 - Pays, compte, modèle et acceptation des conditions : gates avant usage ; aucun contournement géographique.
 
-**Verdict :** premier candidat à qualifier, ZDR recommandé si accessible comme documenté, données minimisées et consentement requis. Contexte borné proposé : profil ≤4 000 caractères + ≤6 posts/12 000 caractères d’extraits autorisés + règles confirmées séparées ; jamais toute l’archive. Si le compte ou les conditions ne conviennent pas, ne pas activer la génération tant qu’une alternative conforme n’est pas validée. [GROQ-1 à 3]
+**Verdict :** retenu avec OpenRouter pour comparaison (décision du 13 novembre 2026), ZDR recommandé si accessible comme documenté, données minimisées et consentement requis. Aucun modèle figé avant tests comparatifs (français, instructions, style, latence, limites). Contexte borné proposé : profil ≤4 000 caractères + ≤6 posts/12 000 caractères d’extraits autorisés + règles confirmées séparées ; jamais toute l’archive. Si le compte ou les conditions ne conviennent pas, ne pas activer la génération tant qu’une alternative conforme n’est pas validée. [GROQ-1 à 3]
 
 ### Gemini Developer API Free Tier — alternative restreinte
 
@@ -62,9 +62,9 @@
 | Service | Allocation documentée | Limites et confidentialité | Décision |
 |---|---|---|---|
 | Cloudflare Workers AI | 10 000 **Neurons/jour** gratuits | Unités de calcul, pas tokens/requêtes ; coût par modèle, exigences de compte/carte et conditions de données à confirmer ; dépassement nécessite Workers Paid | Candidat secondaire, niveau de preuve tarifaire I |
-| OpenRouter, variantes `:free` | 20 requêtes/minute et 50/jour sans achat préalable | Le plafond supérieur lié à un achat est exclu ; modèles/fournisseurs changent, confidentialité dépend aussi de l’amont, requêtes en échec peuvent compter selon les règles | Secours explicite après revue, jamais routage vers une variante payante |
+| OpenRouter, variantes `:free` | 20 requêtes/minute et 50/jour sans achat préalable | Le plafond supérieur lié à un achat est exclu ; modèles/fournisseurs changent, confidentialité dépend aussi de l’amont, requêtes en échec peuvent compter selon les règles | **Co-candidat retenu pour comparaison avec Groq** (décision du 13 nov) ; jamais routage vers une variante payante |
 
-Sources [LLM-ALT-1 à 3]. Aucun classement de qualité du français ou de vitesse n’est inventé. Aucun de ces fournisseurs n’est activé automatiquement si le fournisseur principal tombe en panne : changer de destinataire des données nécessite un consentement compatible.
+Sources [LLM-ALT-1 à 3]. Aucun classement de qualité du français ou de vitesse n’est inventé : la comparaison Groq/OpenRouter se fera sur des tâches réelles autorisées, avec les clés de l’utilisateur, avant toute sélection définitive. Aucun fournisseur n’est activé automatiquement en cas de panne ni basculé vers du payant : changer de destinataire des données nécessite un consentement compatible.
 
 ## 4. Recherche et extraction
 
@@ -120,7 +120,7 @@ L’offre Free documentée prévoit **5 USD renouvelés chaque mois**, sans cart
 
 La documentation des limites mentionne 5 exécutions simultanées et 16 384 Mo de mémoire cumulée en Free ; ce sont des plafonds, pas des besoins de l’assistant. Les données chez Apify peuvent subsister au-delà de la rétention locale : la documentation mentionne les dix dernières exécutions conservées quatre mois et un comportement différent pour les stockages nommés. Vérifier le type exact de stockage employé par le skill.
 
-**Le skill existant n’a pas été lu, exécuté ni intégré.** Demander ses fichiers/instructions, Actors exacts, schémas, coûts, authentification et exemples anonymisés. Séparer ses capacités d’analyse réutilisables de son éventuelle collecte LinkedIn. Une collecte non officielle peut violer les conditions de LinkedIn même pour ses propres posts ; elle n’entre pas dans le socle retenu. L’archive centrale est alimentée par un **import indépendant d’Apify** (originaux utilisateur, export autorisé du skill après audit, autre source conforme) ; aucun mécanisme de publication Apify n’est retenu. [APIFY-1 à 5 ; LI-LEGAL dans API_INTEGRATIONS.md]
+**Le skill `apify-ultimate-scraper` a été audité en lecture seule le 13 novembre 2026** (fichiers locaux ; voir [APIFY_SKILL_AUDIT.md](APIFY_SKILL_AUDIT.md)) : skill d’agent pilotant le CLI Apify, Actors LinkedIn tous community/PPE, coûts indicatifs ~0,001–0,02 $/résultat à recontrôler, scraping bloqué à grande échelle. Aucune exécution, original inchangé. Une collecte non officielle peut violer les conditions de LinkedIn même pour ses propres posts ; elle n’entre pas dans le socle retenu. L’archive centrale est alimentée par un **import indépendant d’Apify** (originaux utilisateur, export autorisé du skill, autre source conforme) ; aucun mécanisme de publication Apify n’est retenu. [APIFY-1 à 5 ; LI-LEGAL dans API_INTEGRATIONS.md]
 
 **Mission 0.5 :** les pages conditions/abonnements/stockage Apify n’ont pas pu être rouvertes ; les valeurs ci-dessus restent des preuves Mission 0 à recontrôler. Un extrait indexé du DPA Apify (8 juillet 2026) décrit client responsable du traitement/Apify sous-traitant avec clauses de suppression et sous-traitance ultérieure : cela ne constitue ni une autorisation de collecter LinkedIn ni une preuve de conformité tunisienne. Le coût d’un import dépend de l’Actor réel et de ses stockages ; aucune estimation chiffrée par lot n’est inventée.
 
@@ -156,6 +156,8 @@ Le Telegram Trigger natif repose sur un webhook **HTTPS public**. Le long pollin
 
 ## 7. Hébergement
 
+**Décision du 13 novembre 2026 :** développement et premiers tests sur le **PC de l’utilisateur** ; Oracle Always Free à étudier plus tard ; PC d’un ami en secours. Aucune installation ni aucun déploiement sur un serveur distant maintenant ; le développement n’est pas bloqué par le choix définitif de l’hébergement. Les deux options ci-dessous restent des preuves documentaires, pas des cibles activées.
+
 ### Oracle Cloud Always Free
 
 **À ne pas confondre avec l’essai 300 USD / 30 jours.** L’Always Free est annoncé sans expiration, sous conditions du service, pas garanti sans interruption.
@@ -177,7 +179,7 @@ Documentation technique consultée au 13 novembre 2026 :
 - Pas de SLA pour l’usage exclusivement Always Free ; compte abandonné et VM inactive sont deux notions distinctes.
 - Confidentialité : cloud tiers et traitements internationaux possibles ; minimisation, contrôle des accès et sauvegarde indépendante nécessaires.
 
-**Verdict :** alternative conditionnelle, pas préalable bloquant si une machine de confiance existe. [HOST-1 à 4]
+**Verdict :** à étudier plus tard, pas activé maintenant ; le PC de l’utilisateur sert au développement et aux premiers tests. Alternative conditionnelle, pas préalable bloquant si une machine de confiance existe. [HOST-1 à 4]
 
 ### PC portable d’un ami
 
@@ -185,7 +187,7 @@ Pas d’abonnement serveur si matériel/connexion existent et sont mis à dispos
 
 Veille, fermeture du capot, déplacement, redémarrages et coupures interrompent le service. Isolation système/stockage nécessaire, sans prétendre protéger les secrets contre l’administrateur hôte. Prévoir droit d’arrêt, restitution et suppression des données. Aucune exposition publique nécessaire pour Telegram en long polling ; callback LinkedIn à vérifier séparément.
 
-**Verdict :** choix de départ le plus simple si confiance, coûts assumés et interruptions sont acceptés. Sinon décision d’hébergement non résolue, pas de promesse 0 € tout compris.
+**Verdict :** secours si le PC de l’utilisateur ne convient plus ; le choix de départ est le PC de l’utilisateur. Ne devient un départ que si confiance, coûts assumés et interruptions sont acceptés. Sinon décision d’hébergement non résolue, pas de promesse 0 € tout compris.
 
 ## 8. Dimensionnement indicatif, pas une mesure
 
@@ -243,6 +245,7 @@ Les sources ci-dessous ont été consultées le 13 novembre 2026 ; elles ne prou
 - APIFY-3 [Apify — coûts des Actors](https://docs.apify.com/actors/running/actors-in-store.md) — D.
 - APIFY-4 [Apify — limites](https://docs.apify.com/account/limits.md) — D.
 - APIFY-5 [Apify — stockage](https://docs.apify.com/storage.md) — D.
+- SKILL-1 Audit local du skill `apify-ultimate-scraper` (`SKILL.md`, `references/actor-index.md`, `references/gotchas.md`, workflows) — fichiers de l’agent lus le 13 novembre 2026 ; voir [APIFY_SKILL_AUDIT.md](APIFY_SKILL_AUDIT.md). Aucune exécution, aucun login, aucun token, aucune modification du skill.
 
 ### Messages, orchestration et hôtes
 

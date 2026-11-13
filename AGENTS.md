@@ -1,18 +1,20 @@
 # LinkedIn AI Assistant
 
-Assistant personnel piloté par Telegram. État : **Phases 2–4 et rappels locaux implémentés (socle conversationnel, archive centrale, import générique, profil descriptif, retrieval borné, rappels Africa/Tunis ; 75 tests sans réseau, publication simulée). Aucune intégration authentifiée ni action externe effectuée. Modalités détaillées encore proposées.**
+Assistant personnel piloté par Telegram. État : **Phases 2–4 et rappels locaux implémentés (75 tests sans réseau, publication simulée). Décisions utilisateur du 13 novembre 2026 intégrées (Mission 0.6) : hébergement local, comparaison Groq/OpenRouter, tableau de bord local planifié, rappel quotidien 10 h. Skill Apify audité. Aucune intégration authentifiée ni action externe. Phase 1 révisée : périmètre à valider avant de coder.**
 
 ## Autorisation de travail
 
-- **CRITICAL : l’utilisateur a autorisé le démarrage de l’implémentation (13 novembre 2026). Toute action externe — création/configuration de compte, publication, upload, test réel — exige une autorisation distincte sur l’action et le contenu exacts.**
-- La spécification porte sur les neuf documents indexés, dont AGENTS.md. Ne créer aucun compte, abonnement, déploiement ou secret sans accord ; aucune action sur un service sans autorisation distincte.
-- Une validation d’architecture n’autorise ni une publication de test ni une autre action externe sur un compte. Ne pas modifier le skill Apify.
+- **CRITICAL : l’utilisateur a autorisé l’implémentation locale (13 novembre 2026) mais a demandé de présenter d’abord les documents actualisés et le périmètre de la Phase 1 révisée avant de poursuivre le codage. Ne pas démarrer l’implémentation complète ni déployer sans validation de ce périmètre.**
+- Toute action externe — création/configuration de compte, publication, upload, appel API réel, test réel — exige une autorisation distincte sur l’action et le contenu exacts. Ne créer aucun compte, abonnement, déploiement ou secret sans accord.
+- La spécification porte sur les documents indexés ci-dessous, dont AGENTS.md. Une validation d’architecture n’autorise ni publication de test ni autre action externe. Ne pas modifier le skill Apify original (audité, voir le rapport dédié).
 
 ## Architecture : socle validé, modalités proposées
 
-**Validés :** Python + SQLite, modularité et fournisseurs interchangeables, Telegram principal, n8n facultatif, Tunisie et `Africa/Tunis`, API officielle LinkedIn, budget 0 € sans paiement obligatoire, validations texte/image distinctes puis finale, archive centrale durable de tous les textes dont la rétention est permise et profil compact persistant, sans archive binaire d’images. Trois posts récents = échantillon, pas plafond de stockage.
+**Validés :** Python + SQLite, modularité et fournisseurs interchangeables, Telegram principal, n8n facultatif, Tunisie et `Africa/Tunis`, API officielle LinkedIn, budget 0 € sans paiement obligatoire ni basculement payant automatique, validations texte/image distinctes puis finale, archive centrale durable des textes dont la rétention est permise et profil compact persistant, sans archive binaire d’images. Trois posts récents = échantillon, pas plafond de stockage.
 
-**Proposés / non vérifiés :** hôte, fournisseurs, scopes/permissions, conditions/consentements, paramètres de rétention/import/retrieval et rappels. Monolithe processus unique et long polling implémentés, non éprouvés sur un compte réel.
+**Décisions du 13 novembre 2026 :** hébergement sur le PC de l’utilisateur pour le développement et les premiers tests (Oracle Always Free à étudier plus tard, PC ami en secours ; aucune installation distante maintenant, développement non bloqué) ; LLM Groq + OpenRouter à comparer (français, instructions, style, latence, limites), aucun modèle figé avant tests, clés fournies par l’utilisateur via `.env` ; tableau de bord web local planifié (localhost, même configuration SQLite que Telegram, jamais exposé publiquement sans protection) ; rappel quotidien à 10 h 00 `Africa/Tunis`, modifiable ; paramètres éditoriaux progressifs configurables.
+
+**Proposés / non vérifiés :** scopes/permissions LinkedIn, conditions/consentements par usage/destination, paramètres de rétention/import/retrieval, seuil d’inactivité 120 h. Monolithe processus unique et long polling implémentés, non éprouvés sur un compte réel. Aucune application LinkedIn Developer antérieure trouvée sur la machine : vérifier le portail avant toute création ; une page entreprise n’est pas intrinsèquement requise pour la publication personnelle.
 
 ## Commandes
 
@@ -33,10 +35,13 @@ Les règles détaillées sont dans les documents suivants ; aucun fichier `.agen
 - [API](docs/API_INTEGRATIONS.md) : permissions, protocoles et accès restant à vérifier.
 - [Services gratuits](docs/FREE_SERVICES_BENCHMARK.md) : sources officielles datées et limites économiques.
 - [Tests](docs/TEST_STRATEGY.md) : invariants et preuves attendues.
+- [Audit du skill Apify](docs/APIFY_SKILL_AUDIT.md) : fonctionnement, Actors LinkedIn, coûts, limites, conformité et modes d’intégration.
 
 ## Contraintes universelles
 
 - Budget validé : **0 €, aucun paiement obligatoire ni fallback payant** ; quota épuisé = arrêt, jamais essai/crédit de bienvenue présenté comme gratuit permanent.
+- LLM : Groq + OpenRouter à comparer avant toute sélection définitive ; changement de modèle/fournisseur sans toucher au métier ; aucun fournisseur payant sans autorisation, aucun basculement automatique vers du payant.
+- Tableau de bord web local : localhost uniquement, même configuration SQLite que Telegram, pas de second chemin de publication (mêmes validations déterministes) ; jamais accessible publiquement sans authentification et protection des secrets.
 - Une documentation publique ne prouve aucun accès de compte. Dater et distinguer fait officiel, proposition et test réel ; conditions tunisiennes/transferts restent non vérifiés.
 - Publication exclusivement par API officielle LinkedIn : approbations texte et image/absence distinctes, puis autorisation finale à usage unique sur la révision exacte ; conserver anti-doublon et invalidation des approbations concernées après modification.
 - **Le LLM ne publie pas.** Ni source web, ni rappel, ni message ambigu ne peut autoriser la publication. Recherche proposée : 3 requêtes / 5 pages maximum par tour.
@@ -47,9 +52,9 @@ Les règles détaillées sont dans les documents suivants ; aucun fichier `.agen
 - Profil descriptif recalculable avec références versions/périodes/couverture/confiance, sans inférence sensible ; identifier les textes assistant pour éviter de renforcer le style IA. Règle normative permanente seulement après confirmation séparée de son texte exact ; correction ponctuelle ≠ règle.
 - Retrieval proposé : filtres SQLite + FTS5 si disponible, échantillons récents/thématiques/par période, 6 posts / 12 000 caractères cumulés et profil 4 000 caractères ; règles confirmées séparées, pas de troncature silencieuse ni toute l’archive à chaque génération.
 - Vérifier séparément stockage/analyse/dérivation/transfert par destination, Telegram inclus ; droits inconnus = aucune persistance provisoire. Les 48 h Marketing APIs concernent leur activité sociale, pas tous les imports/originaux ; consentement ≠ dérogation aux conditions. Restrictions plus strictes et effacements requis/demandés priment et se propagent aux versions/dérivés/index/profil ; ne pas garder illicitement d’anciens textes.
-- Ne jamais journaliser clés, jetons, cookies ou liens signés. Les secrets ne sont ni des paramètres de prompt ni des messages Telegram.
-- Skill Apify exact non fourni/non audité : ne pas invoquer de générique. Examiner fichiers/instructions/dépendances/Actor(s)/entrées-sorties anonymisées et accès/coûts/conditions avant toute intégration ; adaptations seulement proposées, original inchangé, aucun contournement LinkedIn.
+- Secrets via `.env` local (ignoré par git ; `.env.example` factice versionné) : jamais de clé dans le code, les logs, les prompts ou les messages Telegram ; ne jamais demander de coller une clé dans la conversation. Vérifier les variables manquantes au démarrage par leur nom, sans révéler leur contenu. Ne jamais journaliser clés, jetons, cookies ou liens signés.
+- Skill Apify audité le 13 novembre 2026 (voir [rapport](docs/APIFY_SKILL_AUDIT.md)) : skill d’agent pilotant le CLI Apify, Actors LinkedIn community/PPE, scraping non conforme par défaut. Original inchangé, aucune exécution d’Actor sans accord distinct ; intégration par l’import générique (export utilisateur préféré), jamais une dépendance du cœur ni un moyen de publication.
 - Vérifier les droits d’image et approuver le fichier exact indépendamment du texte ; preuve de succès texte ≠ capacité image, `w_member_social` seul ne permet pas le GET versionné du statut d’image.
 - Aucune archive binaire d’images ; RAM seule de bout en bout proposée, sans BLOB/disque temporaire/sauvegarde, métadonnées/hash/droits autorisés seulement. Tampon perdu/redémarrage : nouvel aperçu et approbations image/finale, jamais retrait silencieux ; ne promettre ni suppression Telegram/LinkedIn ni absence de swap OS.
-- Rappels : `Africa/Tunis` fixé ; activation/heure/jours/120 h proposés. `published_at` accepté, jamais `imported_at` ; date imprécise/future/en conflit = clarification, `confirmed_at` du bot seulement comme approximation signalée sans heure serveur. Au plus 1/jour, fusion/reprise sans rafale ; bot utilisable sans rappels.
+- Rappels : `Africa/Tunis` fixé ; rappel quotidien à 10 h 00 choisi par l’utilisateur, modifiable (défaut code actuel 9 h à corriger en Phase 1) ; jours/activation/120 h proposés. `published_at` accepté, jamais `imported_at` ; date imprécise/future/en conflit = clarification, `confirmed_at` du bot seulement comme approximation signalée sans heure serveur. Au plus 1/jour, fusion/reprise sans rafale ; bot utilisable sans rappels.
 - Toute dépendance doit répondre à un besoin actuel et prévoir un point de remplacement ; installation limitée à l’environnement du projet. Les modalités non validées (seuils, durées, RAM images, fournisseurs) restent des propositions à confirmer.

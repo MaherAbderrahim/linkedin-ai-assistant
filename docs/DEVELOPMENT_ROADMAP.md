@@ -1,8 +1,8 @@
 # Ordre de développement et portes de validation
 
-Date : 13 novembre 2026, Mission 0.5. **Socle validé (Python, SQLite central, Telegram, Tunisie/`Africa/Tunis`, API officielle, 0 €, validations séparées, archive textuelle sans fichiers images).** Les phases ci-dessous sont indépendamment livrables ; aucune estimation de délai n’est un engagement. Aucun accès fournisseur n’est présumé.
+Date : 13 novembre 2026, Mission 0.6. **Socle validé (Python, SQLite central, Telegram, Tunisie/`Africa/Tunis`, API officielle, 0 €, validations séparées, archive textuelle sans fichiers images) ; décisions utilisateur du 13 novembre intégrées (hébergement local, Groq/OpenRouter à comparer, tableau de bord local, rappel 10 h).** Les phases ci-dessous sont indépendamment livrables ; aucune estimation de délai n’est un engagement. Aucun accès fournisseur n’est présumé.
 
-**État d’avancement :** phases 2 à 4 livrées localement, plus le cœur local de la phase 8 (rappels `Africa/Tunis`, `/lastpost`, `/reminder`, tick sans rafale) — 75 tests sans réseau passants ; gates non validés humainement, phases 5 à 7 non démarrées. Aucune action externe effectuée.
+**État d’avancement :** phases 2 à 4 livrées localement, plus le cœur local de la phase 8 (rappels `Africa/Tunis`, `/lastpost`, `/reminder`, tick sans rafale) — 75 tests sans réseau passants ; skill Apify audité (documentaire). Gates non validés humainement, phases 5 à 7 non démarrées. Aucune action externe effectuée. **La Phase 1 est révisée ci-dessous ; son périmètre attend la validation utilisateur avant tout codage.**
 
 ## Principes
 
@@ -16,21 +16,33 @@ Date : 13 novembre 2026, Mission 0.5. **Socle validé (Python, SQLite central, T
 
 Livrables : les neuf documents alignés (archive centrale, import indépendant, profil descriptif + règles confirmées, retrieval borné, rétention par origine, images sans archive binaire), décisions validées vs proposées, sources datées.
 
-**Non fait :** code applicatif, dépendances, comptes, tokens, collecte, publication, audit du skill exact (non fourni).
+**Non fait à ce stade (Phase 0.5, documentaire) :** code applicatif, dépendances, comptes, tokens, collecte, publication. Le socle applicatif a été livré depuis aux phases 2 à 4 ; l’audit du skill, réalisé en Mission 0.6, est consigné dans [APIFY_SKILL_AUDIT.md](APIFY_SKILL_AUDIT.md).
 
 **Sortie :** l’utilisateur a autorisé le démarrage de l’implémentation le 13 novembre 2026 (dépôt GitHub créé, documentation poussée). Les modalités restantes restent à confirmer ; chaque action externe exige une autorisation distincte.
 
-## Phase 1 — Décisions et vérifications d’accès non publiantes
+## Phase 1 — Préparation configurable et vérifications non publiantes (révisée)
 
-**Dépendances :** autorisation utilisateur ; aucune action externe sans accord distinct.
+**Dépendances :** validation utilisateur du périmètre ci-dessous ; aucune action externe sans accord distinct. Le développement local n’est bloqué ni par l’hébergement (PC utilisateur décidé) ni par le choix définitif du modèle.
 
-- Hôte, coûts indirects, interruptions ; consentement par usage/destination (Telegram inclus) ; paramètres de rétention, retrieval, rappels, RAM images.
-- Application LinkedIn : produits, scopes visibles, association de Page si requise, callback OAuth réellement utilisable ; identité et scopes vérifiés sans publier ni téléverser.
-- Fournisseurs : offre/pays/modèle/quota/ZDR et absence de facturation automatique ; Tavily sans PAYG ; Telegram configuré avec accord.
-- Skill Apify exact : recevoir fichiers/instructions/dépendances/Actors/I/O anonymisées ; audit documentaire des accès, coûts, droits de collecte/conservation/transfert ; aucune exécution, original inchangé.
+### Volet A — Vérifications et décisions restantes (humain, sans publication)
+
+- Application LinkedIn : vérifier au portail développeur si une application existe déjà (aucune trouvée en local le 13 nov) ; produits/scopes visibles, association de Page seulement si requise par le parcours réel, callback OAuth utilisable ; identité et scopes vérifiés sans publier ni téléverser. Ne rien créer avant vérification ; une page entreprise n’est pas intrinsèquement requise pour la publication personnelle.
+- Fournisseurs : l’utilisateur crée le `.env` local (Groq, OpenRouter, Telegram, recherche) ; offre/pays/quota/ZDR et absence de facturation automatique à recontrôler ; Tavily sans PAYG. Aucun modèle figé avant les tests comparatifs.
+- Consentements par usage/destination (Telegram inclus) ; paramètres de rétention, retrieval, RAM images ; seuil d’inactivité 120 h proposé.
 - Qualifier documentairement `/rest/posts`, la version supportée et le parcours image (restriction GET) ; aucun test de création ici.
 
-**Gate G1 :** aucune incompatibilité connue avec 0 €, hôte et données acceptés, chemin officiel plausible, droits d’import définis par origine. Tout test non effectué reste explicitement à effectuer. Si blocage publication : décider un mode préparation sans publication, pas un objectif complet atteint.
+### Volet B — Préparation locale (code, simulé, sans réseau)
+
+Périmètre précis proposé, à valider avant codage :
+
+1. **Secrets et démarrage** : chargement `.env` (parseur stdlib minimal), validation des variables requises par leur nom au démarrage avec messages explicites sans révéler les valeurs ; `.env.example` déjà créé ; mode simulation conservé sans jeton. Tests : variable manquante signalée sans contenu, aucune clé dans logs/erreurs.
+2. **Rappel 10 h** : défaut `DEFAULT_HOUR` 9 → 10 (modifiable), jours/activation inchangés ; tests de créneau existants adaptés.
+3. **Paramètres progressifs partagés** : extension de `settings` (thématiques, ton, public cible, longueur, langue, fréquence, horaires rappels, préférences recherche/images, modèle LLM, fournisseur recherche) ; lecture/écriture via commandes Telegram ; mêmes valeurs servies au tableau de bord. Aucune valeur figée arbitrairement ; règles normatives toujours confirmées séparément.
+4. **Abstraction LLM + comparaison** : contrat `LLMProvider` unique, adaptateurs Groq et OpenRouter (simulés en tests), sélection modèle/fournisseur par paramètre ; harness de comparaison sur tâches identiques (mesure latence/usage, évaluation humaine du français/instructions/style) ; table `llm_benchmarks` proposée. Aucun appel réel ni sélection définitive dans cette phase ; aucun fallback payant.
+5. **Interface de publication** : formaliser le contrat `Publisher` (déjà `SimulatedPublisher`) ; aucun adaptateur réel tant que l’accès n’est pas vérifié.
+6. **Squelette du tableau de bord local** : serveur HTTP stdlib lié à `127.0.0.1` (port 8000 proposé), sections « configuration générale » et « état système » en lecture/écriture partagée avec SQLite ; pas de second chemin de publication ; pas d’exposition publique. Développement progressif des autres sections aux phases suivantes.
+
+**Gate G1 (local) :** tests sans réseau passants (secrets, rappel 10 h, paramètres partagés, adaptateurs LLM simulés, dashboard loopback) ; aucune action externe ; variables manquantes signalées sans contenu ; aucun modèle sélectionné définitivement ; aucune clé dans le code/logs. Les vérifications du volet A restent explicitement à effectuer ; si blocage publication : mode préparation sans publication, pas un objectif complet atteint.
 
 ## Phase 2 — Socle conversationnel et garanties d’état (local, simulé)
 
@@ -63,7 +75,7 @@ Livrables : les neuf documents alignés (archive centrale, import indépendant, 
 
 ### Phase 3B — Adaptateur du skill Apify (optionnelle, après audit)
 
-**Dépendances :** G3 + audit du skill exact terminé + droits vérifiés + accord utilisateur. Traduire sa sortie vers le contrat d’import générique ; aucune modification du skill original ; coûts Apify bornés et mesurés avant usage ; si l’audit échoue, la phase 3 reste livrée.
+**Dépendances :** G3 + audit du skill terminé (fait le 13 nov, voir [APIFY_SKILL_AUDIT.md](APIFY_SKILL_AUDIT.md)) + droits vérifiés + accord utilisateur. Traduire sa sortie réelle vers le contrat d’import générique ; aucune modification du skill original ; coûts Apify bornés et mesurés avant usage ; mode préféré = export utilisateur ingéré par l’importeur existant (Phase 3). Si la collecte n’est pas conforme, la phase 3 reste livrée.
 
 ## Phase 4 — Profil descriptif et retrieval borné (local)
 
@@ -80,11 +92,12 @@ Livrables : les neuf documents alignés (archive centrale, import indépendant, 
 
 ## Phase 5 — Recherche web et rédaction
 
-**Dépendances :** G4 + fournisseur LLM/recherche qualifié (conditions, pays, quotas, ZDR, consentement).
+**Dépendances :** G4 + fournisseurs LLM/recherche qualifiés (conditions, pays, quotas, ZDR, consentement), clés utilisateur fournies et comparaison Groq/OpenRouter réalisée.
 
 - SearchProvider Tavily basic, réserve de quota, extraction HTTP sécurisée (SSRF, tailles, délais) ; dossier multi-source daté, contradictions et manques visibles.
-- LLMProvider du modèle retenu ; prompts bornés avec profil + échantillon autorisé ; français naturel, aucun fait personnel inventé, aucune promesse future.
+- LLMProvider Groq/OpenRouter ; sélection du modèle après tests comparatifs (français, instructions, style, latence, limites), jamais avant ; prompts bornés avec profil + échantillon autorisé ; français naturel, aucun fait personnel inventé, aucune promesse future ; aucun fallback payant.
 - Corrections ciblées avec différences visibles ; changement factuel ⇒ revérification ; proposition/confirmation distincte des règles permanentes ; révocation.
+- Tableau de bord : sections éditoriale, IA (fournisseurs/modèles/benchmarks) et recherches branchées sur la même configuration SQLite.
 
 **Gate G5 :** recette humaine sur plusieurs sujets/corrections ; sources réellement consultées ; pas d’apprentissage implicite ; pas de facturation ni boucle de recherche illimitée ; droits de transfert vérifiés avant chaque envoi.
 
@@ -116,9 +129,10 @@ Livrables : les neuf documents alignés (archive centrale, import indépendant, 
 
 Les rappels peuvent être développés après G2 avec date fournie manuellement, puis branchés sur l’archive (G3) et la publication (G6).
 
-- Créneaux `Africa/Tunis`, jours, pause, inactivité 120 h proposée ; `published_at` accepté jamais `imported_at` ; dates imprécises/futures/conflit clarifiées ; `confirmed_at` seulement en approximation signalée.
+- Créneaux `Africa/Tunis` (rappel quotidien 10 h par défaut, modifiable), jours, pause, inactivité 120 h proposée ; `published_at` accepté jamais `imported_at` ; dates imprécises/futures/conflit clarifiées ; `confirmed_at` seulement en approximation signalée.
 - Déduplication quotidienne, fusion des motifs, reprise sans rafale, heure manquante/répétée ; déclaration de publication hors bot.
-- Installation sur l’hôte approuvé, service, permissions, sauvegarde chiffrée des seules données autorisées, restauration en publication bloquée + réconciliation ; purges et invalidation des dérivés ; statuts quota/capacité ; rotation des logs.
+- Exploitation sur le PC utilisateur (dev/tests) ; Oracle Always Free à étudier plus tard, PC ami en secours ; aucune installation distante sans accord. Service, permissions, sauvegarde chiffrée des seules données autorisées, restauration en publication bloquée + réconciliation ; purges et invalidation des dérivés ; statuts quota/capacité ; rotation des logs.
+- Tableau de bord : section état système complète (services, erreurs, quotas, dernières exécutions) ; authentification et protection des secrets obligatoires si exposition Internet ultérieure.
 
 **Gate G8 :** scénario complet sur l’hôte réel ; bot utilisable sans rappel ; restauration testée ; responsabilité d’exploitation acceptée ; aucun SLA promis.
 

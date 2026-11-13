@@ -1,6 +1,6 @@
 # Intégrations API et vérification de faisabilité
 
-Date de référence : 13 novembre 2026, Mission 0.5. **Vérification documentaire uniquement : aucun accès authentifié au compte utilisateur, aucun jeton obtenu, aucune publication ni aucun transfert média réalisé.** Les endpoints ci-dessous sont des spécifications pour les phases futures, pas des appels exécutés. L’archive centrale SQLite et l’import indépendant du fournisseur sont décrits dans [l’architecture](TECHNICAL_ARCHITECTURE.md) ; ce document fixe les protocoles et conditions par intégration.
+Date de référence : 13 novembre 2026, Mission 0.6. **Vérification documentaire uniquement : aucun accès authentifié au compte utilisateur, aucun jeton obtenu, aucune publication ni aucun transfert média réalisé.** Le socle local (archive SQLite, import générique, profil, retrieval, rappels) est implémenté et testé sans réseau ; les endpoints ci-dessous restent des spécifications pour les phases futures, pas des appels exécutés. L’archive centrale et l’import indépendant sont décrits dans [l’architecture](TECHNICAL_ARCHITECTURE.md) ; ce document fixe les protocoles et conditions par intégration.
 
 ## 1. Registre des capacités
 
@@ -10,13 +10,15 @@ Date de référence : 13 novembre 2026, Mission 0.5. **Vérification documentair
 | LinkedIn : OAuth et identification du membre | Documentés ; produits/scopes requis | NON TESTÉ | Vérifier application, produits, redirection, scopes et identité |
 | LinkedIn : publier un texte personnel | `w_member_social` documenté pour création | NON TESTÉ | Endpoint exact à éprouver après consentement spécifique à une publication de test |
 | LinkedIn : lire l’historique des posts | `r_member_social` restreint | NON TESTÉ, accès non présumé | Import indépendant (originaux utilisateur, skill audité, autre source conforme) comme solution de départ |
-| Archive centrale SQLite et import générique | Contrats internes proposés | NON IMPLÉMENTÉ | Indépendant d’Apify et du droit de lecture ; droits par origine avant persistance |
+| Archive centrale SQLite et import générique | Contrats internes | IMPLÉMENTÉ localement (tests sans réseau) | Indépendant d’Apify et du droit de lecture ; droits par origine avant persistance |
 | LinkedIn : initialiser/téléverser une image | Documenté avec permissions adaptées | NON TESTÉ | Gate indépendant du texte |
 | LinkedIn : lire le statut d’une image | `w_member_social` seul insuffisant pour GET versionné | NON TESTÉ | Ne pas baser le pipeline sur un polling inaccessible |
-| Groq Free : génération | Offre et conservation documentées | NON TESTÉ | Modèle, quotas, région et consentement à qualifier |
+| Groq : génération | Offre et conservation documentées | NON TESTÉ | Retenu pour comparaison avec OpenRouter ; modèle/quota/région/consentement à qualifier |
+| OpenRouter : génération unifiée | Variantes `:free` documentées | NON TESTÉ | Comparaison multi-modèles ; aucun routage payant ; confidentialité amont à vérifier |
 | Tavily : recherche basic | Gratuit récurrent documenté | NON TESTÉ | Compte Free sans PAYG, test ultérieur |
 | Commons : recherche et métadonnées | API publique documentée | NON TESTÉ en intégration | Vérifier licences et conditions fichier par fichier |
-| Skill Apify existant | Existence déclarée par l’utilisateur ; contenu inconnu | NON FOURNI/NON AUDITÉ | Aucun Actor, schéma ni accès supposé |
+| Skill Apify | Fichiers locaux lus | AUDITÉ (documentaire, 13 nov) | Voir APIFY_SKILL_AUDIT.md ; Actors community/PPE ; aucune exécution ; import générique préféré |
+| Tableau de bord web local | Architecture proposée | NON IMPLÉMENTÉ | localhost, même SQLite que Telegram ; jamais public sans protection |
 | Génération d’image | Aucune offre compatible établie | NON ACTIVÉ | Hors socle |
 | Oracle Always Free | Offre documentée | NON TESTÉ | Capacité, carte, région, coûts et conditions à valider |
 
@@ -44,6 +46,8 @@ La documentation consultée affiche `202610` comme version la plus récente de s
 6. Conditions d’utilisation acceptées par l’utilisateur et secrets installés par un canal local sûr, pas dans Telegram ni cette documentation.
 
 Ne pas promettre une approbation automatique de produit, l’absence de conditions de Page ni une disponibilité universelle selon les régions/comptes.
+
+**Vérification de l’existant (13 novembre 2026) :** aucune intégration LinkedIn antérieure trouvée dans l’espace de travail `D:\PFE` — uniquement des scrapers d’offres d’emploi publics (`_work/li_crawl.py`, `li.py`, `li_filter.py`) sans rapport avec la publication, aucune application Developer, aucun `client_id`/secret/jeton. La « méthode précédente » n’existe que dans la documentation. **Action utilisateur :** vérifier au portail développeur si une application existe déjà avant toute création. La publication personnelle `w_member_social` + OIDC ne requiert pas intrinsèquement de page entreprise (LI-9), mais une application Developer reste nécessaire pour l’OAuth. L’interface `Publisher` est abstraite et remplaçable ; simulateur en place jusqu’à l’accès réel. Aucun contournement.
 
 ### 2.3 OAuth, identité et renouvellement
 
@@ -137,11 +141,13 @@ La fenêtre de reprise, les limites de débit et la confidentialité sont sourc�
 
 ## 4. LLM, recherche et extraction
 
-### LLMProvider
+### LLMProvider — Groq + OpenRouter à comparer
 
-Groq Free est candidat prioritaire, pas un compte ou un modèle sélectionné. Relever identifiant exact de modèle, quota organisation/modèle, tailles de contexte/sortie, données envoyées, conditions de conservation et disponibilité géographique. Utiliser une API d’inférence standard sans batch ni fine-tuning au MVP.
+Décision du 13 novembre 2026 : **Groq (API officielle) et OpenRouter (API unifiée)** retenus pour comparer plusieurs modèles. Aucun modèle sélectionné définitivement avant tests comparatifs (qualité du français, suivi des instructions, reproduction du style, latence, limites d’usage). Clés fournies par l’utilisateur via `.env` (`GROQ_API_KEY`, `OPENROUTER_API_KEY`) ; jamais dans le code, les logs ou le chat. Contrat `LLMProvider` unique, changement de modèle/fournisseur par paramètre.
 
-Contrat : texte/structure de réponse avec usage mesuré ; sortie traitée comme non fiable. Aucune autorisation, aucun secret LinkedIn ni transcript complet envoyé. Contexte borné : profil descriptif compact (≤4 000 caractères proposés) + échantillon ciblé de l’archive (≤6 posts/12 000 caractères proposés) + règles confirmées séparées ; jamais toute l’archive ni un post dont le transfert n’est pas autorisé. Un changement de modèle peut changer qualité et limites : exécuter une petite recette française avant acceptation, sans afficher de performance inventée.
+Relever pour chaque modèle : identifiant exact, quota organisation/modèle, tailles de contexte/sortie, données envoyées, conditions de conservation, disponibilité géographique. API d’inférence standard sans batch ni fine-tuning au MVP. OpenRouter : variantes `:free` uniquement, plafond supérieur lié à un achat exclu, aucun routage automatique vers une variante payante ; confidentialité dépend aussi du fournisseur amont.
+
+Contrat : texte/structure de réponse avec usage mesuré ; sortie traitée comme non fiable. Aucune autorisation, aucun secret LinkedIn ni transcript complet envoyé. Contexte borné : profil descriptif compact (≤4 000 caractères proposés) + échantillon ciblé de l’archive (≤6 posts/12 000 caractères proposés) + règles confirmées séparées ; jamais toute l’archive ni un post dont le transfert n’est pas autorisé. Un changement de modèle peut changer qualité et limites : recette française avant acceptation, sans performance inventée. **Aucun fournisseur payant sans autorisation, aucun basculement automatique.**
 
 Gemini Free exige une attention particulière : les conditions interdisent l’envoi d’informations sensibles, confidentielles ou personnelles aux Unpaid Services. Les données publiques ne sont pas automatiquement non personnelles. ZDR Groq est documenté mais pas configuré ; aucun réglage de compte n’est changé dans cette mission. Voir GEM-5/GROQ-3 dans le comparatif.
 
@@ -177,30 +183,23 @@ Le cœur ne dépend pas d’Apify. Enveloppe structurée proposée (à figer apr
 
 Pipeline : droits → parsing borné non fiable → comparaison (ID typé prioritaire, repli conservateur texte normalisé versionné + date précise + auteur + métadonnées) → plan immuable (nouveau/connu/version/conflit/ambigu/incomplet/refus) → accord lot/éléments → transaction idempotente avec revalidation. Détails et invariants dans [l’architecture](TECHNICAL_ARCHITECTURE.md) et [les tests](TEST_STRATEGY.md). Un import ne publie rien et ne résout jamais automatiquement `UNKNOWN_OUTCOME`.
 
-### 6.2 Skill Apify — informations demandées avant intégration
+### 6.2 Skill Apify — audit réalisé (13 novembre 2026)
 
-**Demande explicite : fournir le skill existant ou ses fichiers/instructions, son interface d’appel et un exemple d’entrée/sortie anonymisé.** La présence d’un skill Apify générique dans un environnement ne prouve pas qu’il s’agit de celui de l’utilisateur ni qu’il possède les accès nécessaires. Aucun skill Apify n’a été invoqué pendant cette mission ; le skill original ne sera pas modifié sans accord.
+Le skill `apify-ultimate-scraper` a été **audité en lecture seule** (fichiers locaux : `SKILL.md`, `references/actor-index.md`, `references/gotchas.md`, guides de workflows). Rapport complet : [APIFY_SKILL_AUDIT.md](APIFY_SKILL_AUDIT.md). Aucun Actor exécuté, aucun compte/jeton, original inchangé.
 
-L’audit devra identifier :
+Constats : skill d’agent pilotant le **CLI Apify** (npm `apify-cli` ≥ 1.5.0, auth `APIFY_TOKEN`/OAuth) ; Actors LinkedIn tous **community/PPE** (`harvestapi/linkedin-profile-posts` : `profiles`+`maxPosts` → `postText`/`publishedAt`/`url`/`likes`/`comments` ; `harvestapi/linkedin-company-posts` ; `apimaestro/linkedin-post-detail`…) ; coûts indicatifs ~0,001–0,02 $/résultat à recontrôler ; LinkedIn bloque le scraping à grande échelle (lots < 100 profils, runs ≥ 5 min d’intervalle, résultats vides occasionnels, posts privés → vide sans erreur) ; sessions/cookies gérés en interne. Les guides ne garantissent pas d’URN typé → repli de comparaison conservateur. **Scraper LinkedIn, même ses propres posts, peut violer les conditions LinkedIn** ; un compte Apify autorisé n’est pas une autorisation LinkedIn.
 
-1. Actor exact, propriétaire/version, commandes ou endpoints, dépendances et licence du code réutilisable.
-2. Données lues : texte, dates, auteur, URL/URN, médias ; ordre, pagination, capacité à borner réellement un lot et à distinguer posts/reposts/commentaires.
-3. Authentification et domaines : aucun cookie `li_at`, mot de passe ni secret à envoyer dans le chat ; décrire le mécanisme sans divulguer les valeurs.
-4. Facturation : ressources/événements, proxy, stockage, éventuel essai propre à l’Actor, limite monétaire et reprise après quota ; aucune estimation « X posts coûtent Y » sans mesure.
-5. Sorties d’analyse de style séparables de la collecte, erreurs, déduplication, conservation et effacement côté Apify (stockages nommés vs non nommés, durée).
-6. Conformité des accès à LinkedIn et risques de suspension. Un compte Apify autorisé ne constitue pas une autorisation LinkedIn de scraping ; les conditions Apify et LinkedIn sont distinctes et cumulatives.
-
-**Modes d’intégration possibles, par ordre de préférence :** (1) l’utilisateur fournit un export autorisé que l’importeur générique ingère — aucun Actor exécuté par l’application ; (2) adaptateur dédié traduisant la sortie du skill vers l’enveloppe ci-dessus, après audit et accord, skill original inchangé ; (3) réutilisation des seules règles d’analyse/parsing conformes, sans collecte. Si la collecte n’est pas conforme, elle n’entre pas dans le socle ; l’import manuel reste disponible. Aucune publication par Apify n’est admise.
+**Modes d’intégration, par ordre de préférence :** (1) l’utilisateur fournit un export autorisé que l’importeur générique ingère — aucun Actor exécuté par l’application (mode préféré, déjà implémenté) ; (2) adaptateur dédié traduisant la sortie réelle du skill vers l’enveloppe ci-dessus, après audit de sortie réelle, droits vérifiés et accord, skill original inchangé, coûts bornés/mesurés (Phase 3B optionnelle) ; (3) réutilisation des seules règles d’analyse/parsing conformes, sans collecte. Si la collecte n’est pas conforme, elle n’entre pas dans le socle ; l’import manuel reste disponible. Aucune publication par Apify n’est admise. Le skill reste un outil d’agent, pas une dépendance runtime du cœur.
 
 ## 7. Checklist humaine avant activation future
 
 - [ ] Socle validé ; modalités restantes (seuils, durées, RAM images) et phase suivante explicitement approuvées.
 - [ ] Propriétaire et profil personnel cible confirmés ; utilisation Tunisie/`Africa/Tunis` actée ; conditions tunisiennes/transferts vérifiées pour le traitement réel.
-- [ ] Hôte autorisé, coûts indirects assumés, callback OAuth résolu et secrets gérés localement.
-- [ ] Produits/scopes de l’application LinkedIn visibles ; permissions réellement consenties consignées sans token.
+- [ ] Hôte décidé (PC utilisateur dev/tests) ; coûts indirects assumés ; callback OAuth résolu ; secrets `.env` gérés localement.
+- [ ] Application LinkedIn existante vérifiée au portail (aucune trouvée en local) avant toute création ; produits/scopes visibles ; permissions réellement consenties consignées sans token.
 - [ ] Identité auteur confirmée ; refresh automatique non supposé ; parcours reconnexion prévu.
-- [ ] Droits d’import définis par origine/usage/destination ; skill Apify exact fourni et audité avant tout adaptateur ; complétude de l’historique et limites des rappels expliquées.
-- [ ] Fournisseurs LLM/recherche, modèle exact, régions, confidentialité, quotas et absence de facturation automatique vérifiés.
+- [ ] Droits d’import définis par origine/usage/destination ; skill Apify audité (fait) ; adaptateur éventuel seulement après droits/accord ; complétude de l’historique et limites des rappels expliquées.
+- [ ] Fournisseurs LLM (Groq/OpenRouter) et recherche, clés `.env` fournies, comparaison réalisée, modèle exact choisi après tests, régions/confidentialité/quotas et absence de facturation automatique vérifiés.
 - [ ] Publication texte testée seulement après autorisation séparée du contenu réel ; preuve officielle conservée ; archive atomique vérifiée.
 - [ ] Images non activées avant test indépendant du parcours officiel, des validations de droits et de l’absence d’archive binaire.
 - [ ] Un échec d’accès ne débloque aucun mécanisme non officiel.
