@@ -30,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Assistant LinkedIn personnel — socle phase 2")
     parser.add_argument("--config", default="config.toml", help="fichier de configuration TOML local")
     parser.add_argument("--once", action="store_true", help="un seul cycle de réception puis arrêt")
+    parser.add_argument("--local", action="store_true", help="mode interactif local sans réseau (simulation)")
     args = parser.parse_args(argv)
 
     for stream in (sys.stdout, sys.stderr):
@@ -47,6 +48,12 @@ def main(argv: list[str] | None = None) -> int:
 
     conn = db.connect(config.db_path)
     purge.purge(conn)
+
+    if args.local:
+        from .local import run_local
+
+        run_local(conn, config)
+        return 0
 
     if config.simulation:
         print(

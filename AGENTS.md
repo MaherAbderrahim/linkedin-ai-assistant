@@ -19,6 +19,7 @@ Assistant personnel piloté par Telegram. État : **Phases 2–3 implémentées 
 - `python -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev]"` — installation locale (Windows ; Linux/macOS : `.venv/bin/python`)
 - `.venv/Scripts/python -m pytest -q` — tests sans réseau
 - `.venv/Scripts/linkedin-assistant --config config.toml` — démarrage ; sans `TELEGRAM_BOT_TOKEN`, mode simulation sans aucune action réseau. Le jeton ne va jamais dans un fichier versionné.
+- `.venv/Scripts/linkedin-assistant --config config.toml --local` — test interactif local sans réseau : texte libre = révision, numéros = boutons, publication simulée.
 
 ## Rules
 
