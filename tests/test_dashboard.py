@@ -116,6 +116,30 @@ def test_bench_page_empty_and_filled(tmp_path):
         conn.close()
 
 
+def test_archive_page_empty_and_filled(tmp_path):
+    from linkedin_assistant import store
+
+    config, conn = make(tmp_path)
+    try:
+        code, page = dashboard.render(conn, "/archive")
+        assert code == 200 and "Archive vide" in page
+        # Publication simulée via le socle (source A) : texte exact archivé.
+        from conftest import approved_draft
+
+        _, _, final = approved_draft(conn, "Texte d'archive <test>")
+        intent = store.consume_final_and_create_intent(conn, final, "owner")
+        from linkedin_assistant.publisher import SimulatedPublisher, publish
+
+        assert publish(conn, intent, SimulatedPublisher()) == "PUBLISHED"
+        code, page = dashboard.render(conn, "/archive")
+        assert code == 200
+        assert "assistant_published" in page and "urn:li:share:simulated" not in page
+        assert "&lt;test&gt;" in page  # texte exact affiché, échappé
+        assert "date inconnue" in page  # honnêteté : reçu simulé sans date
+    finally:
+        conn.close()
+
+
 def test_server_serves_loopback(tmp_path):
     config, conn = make(tmp_path)
     conn.close()

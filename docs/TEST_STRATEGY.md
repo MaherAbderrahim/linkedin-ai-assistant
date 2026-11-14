@@ -182,7 +182,7 @@ Critères bloquants : fait personnel inventé, citation/source fabriquée, chiff
 
 Interface `127.0.0.1:8000` (`dashboard_port`), serveur HTTP stdlib, lisant/écrivant la même base SQLite que Telegram. Aucun test réel d'exposition publique n'est effectué au socle.
 
-Implémentés (tests/test_dashboard.py, 142 tests au total au 14 nov) :
+Implémentés (tests/test_dashboard.py, 143 tests au total au 14 nov) :
 
 - Rendu pur testable sans socket : `/` (index), `/config` (registre `prefs`, mêmes validations que `/settings` Telegram), `/state` (compteurs, rappels, variables absentes par noms seuls), `/bench` (lecture seule), 404/405.
 - Configuration partagée : un réglage posé via le tableau de bord est relu identique par Telegram (même table `settings`) ; valeurs invalides et clés inconnues refusées (400, échec conservateur).

@@ -26,7 +26,7 @@ _PAGE = """<!doctype html>
 <head><meta charset="utf-8"><title>Assistant LinkedIn — {title}</title></head>
 <body>
 <h1>Assistant LinkedIn — tableau de bord local</h1>
-<nav><a href="/">Accueil</a> · <a href="/config">Configuration générale</a> · <a href="/state">État système</a> · <a href="/bench">Benchmarks LLM</a></nav>
+<nav><a href="/">Accueil</a> · <a href="/config">Configuration générale</a> · <a href="/state">État système</a> · <a href="/bench">Benchmarks LLM</a> · <a href="/archive">Archive</a></nav>
 {body}
 <p><em>Lié à 127.0.0.1 — ne jamais exposer publiquement sans authentification.
 Aucune publication depuis ce tableau de bord.</em></p>
@@ -47,7 +47,8 @@ def render(conn: sqlite3.Connection, path: str, method: str = "GET", form: dict 
             " partagés avec Telegram (mêmes validations).</li>"
             "<li><a href=\"/state\">État système</a> — brouillons, intents, archive, rappels,"
             " benchmarks, variables d'environnement absentes (noms seuls).</li>"
-            "<li><a href=\"/bench\">Benchmarks LLM</a> — lecture seule ; l'évaluation reste humaine.</li></ul>"
+            "<li><a href=\"/bench\">Benchmarks LLM</a> — lecture seule ; l'évaluation reste humaine.</li>"
+            "<li><a href=\"/archive\">Archive</a> — lecture seule ; textes exacts et dates attestées.</li></ul>"
         )
         return 200, _PAGE.format(title="Accueil", body=body)
     if path == "/config":
@@ -62,6 +63,10 @@ def render(conn: sqlite3.Connection, path: str, method: str = "GET", form: dict 
         if method != "GET":
             return 405, _PAGE.format(title="Erreur", body="<p>Méthode non autorisée.</p>")
         return 200, _PAGE.format(title="Benchmarks LLM", body=_bench_body(conn))
+    if path == "/archive":
+        if method != "GET":
+            return 405, _PAGE.format(title="Erreur", body="<p>Méthode non autorisée.</p>")
+        return 200, _PAGE.format(title="Archive", body=_archive_body(conn))
     return 404, _PAGE.format(title="Introuvable", body="<p>Page inconnue.</p>")
 
 
@@ -167,6 +172,41 @@ def _bench_body(conn: sqlite3.Connection) -> str:
         "<p>Aucun appel réseau : adaptateurs simulés ; l'évaluation du français, des"
         " instructions et du style reste humaine.</p>"
         "<ul>" + "".join(summary) + "</ul><ol>" + "".join(items) + "</ol>"
+    )
+
+
+def _archive_body(conn: sqlite3.Connection) -> str:
+    """Archive centrale en lecture seule : textes exacts, dates attestées, provenances.
+
+    Aucune suppression ni modification depuis cette page : un effacement reste
+    une demande explicite propagée aux versions, dérivés et index.
+    """
+    rows = conn.execute(
+        "SELECT hp.id, hp.published_at, hp.published_at_precision, hp.confirmed_at, hp.visibility, "
+        "hv.text, hv.authorship, "
+        "(SELECT GROUP_CONCAT(hs.origin, ', ') FROM history_sources hs WHERE hs.post_id = hp.id) AS origins "
+        "FROM history_posts hp LEFT JOIN history_versions hv ON hv.post_id = hp.id AND hv.version = hp.current_version "
+        "ORDER BY hp.updated_at DESC LIMIT 50"
+    ).fetchall()
+    if not rows:
+        return "<p>Archive vide. Les publications confirmées et les imports accordés y apparaîtront.</p>"
+    items = []
+    for row in rows:
+        published = row["published_at"] or "date inconnue"
+        if row["published_at_precision"] and row["published_at_precision"] != "second":
+            published += f" (précision : {row['published_at_precision']})"
+        confirmed = f" · confirmé {row['confirmed_at']}" if row["confirmed_at"] else ""
+        text = row["text"] if row["text"] else "(texte non enregistré)"
+        items.append(
+            f"<li><strong>{_esc(published)}</strong> · {_esc(row['visibility'] or 'visibilité inconnue')}"
+            f" · auteur : {_esc(row['authorship'] or '?')} · origines : {_esc(row['origins'] or '?')}"
+            f"{confirmed}"
+            f"<br><pre>{_esc(text)}</pre></li>"
+        )
+    return (
+        "<h2>Archive centrale (lecture seule)</h2>"
+        "<p>Textes exacts conservés, dates de publication attestées (jamais la date d'import)."
+        " Aucune action d'effacement ici.</p><ol>" + "".join(items) + "</ol>"
     )
 
 
