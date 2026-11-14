@@ -43,6 +43,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Configuration invalide : {exc}", file=sys.stderr)
         return 2
 
+    if config.missing_env:
+        # Signal par NOM uniquement : aucune valeur n'est jamais affichée ni journalisée.
+        print("Variables d'environnement absentes (noms seuls) : " + ", ".join(config.missing_env))
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     log.addFilter(_RedactingFilter(config.telegram_token))
 

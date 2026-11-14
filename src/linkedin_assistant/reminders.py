@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from . import store
 
 TZ = ZoneInfo("Africa/Tunis")
-DEFAULT_HOUR = 9
+DEFAULT_HOUR = 10  # décidé par l'utilisateur (13 nov 2026), modifiable via reminder_hour
 DEFAULT_DAYS = "0,1,2,3,4,5,6"
 DEFAULT_INACTIVITY_HOURS = 120
 

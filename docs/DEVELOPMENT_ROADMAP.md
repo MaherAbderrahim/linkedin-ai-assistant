@@ -2,7 +2,7 @@
 
 Date : 13 novembre 2026, Mission 0.6. **Socle validé (Python, SQLite central, Telegram, Tunisie/`Africa/Tunis`, API officielle, 0 €, validations séparées, archive textuelle sans fichiers images) ; décisions utilisateur du 13 novembre intégrées (hébergement local, Groq/OpenRouter à comparer, tableau de bord local, rappel 10 h).** Les phases ci-dessous sont indépendamment livrables ; aucune estimation de délai n’est un engagement. Aucun accès fournisseur n’est présumé.
 
-**État d’avancement :** phases 2 à 4 livrées localement, plus le cœur local de la phase 8 (rappels `Africa/Tunis`, `/lastpost`, `/reminder`, tick sans rafale) — 75 tests sans réseau passants ; skill Apify audité (documentaire). Gates non validés humainement, phases 5 à 7 non démarrées. Aucune action externe effectuée. **La Phase 1 est révisée ci-dessous ; son périmètre attend la validation utilisateur avant tout codage.**
+**État d'avancement :** phases 2 à 4 livrées localement, plus le cœur local de la phase 8 (rappels `Africa/Tunis`, `/lastpost`, `/reminder`, tick sans rafale) — 75 tests sans réseau passants ; skill Apify audité (documentaire). Gates non validés humainement, phases 5 à 7 non démarrées. **Mise à jour du 14 novembre 2026 :** l'accès de publication LinkedIn est provisionné via treg (ADR-16 — connexion active, identité et `w_member_social` vérifiés, publication réelle NON TESTÉE) ; le périmètre de la Phase 1 volet B est **validé par l'utilisateur avec ordre ajusté** (secrets, rappel 10 h, contrat Publisher d'abord). Les vérifications du volet A sont en partie couvertes par treg ; voir la liste restante ci-dessous.
 
 ## Principes
 
@@ -22,14 +22,18 @@ Livrables : les neuf documents alignés (archive centrale, import indépendant, 
 
 ## Phase 1 — Préparation configurable et vérifications non publiantes (révisée)
 
-**Dépendances :** validation utilisateur du périmètre ci-dessous ; aucune action externe sans accord distinct. Le développement local n’est bloqué ni par l’hébergement (PC utilisateur décidé) ni par le choix définitif du modèle.
+**Dépendances :** périmètre volet B **validé par l'utilisateur le 14 novembre 2026** (ordre ajusté : 1. secrets, 2. rappel 10 h, 5. contrat Publisher, puis 3. paramètres partagés, 4. LLM, 6. dashboard) ; aucune action externe sans accord distinct. Le développement local n'est bloqué ni par l'hébergement (PC utilisateur décidé) ni par le choix définitif du modèle.
 
 ### Volet A — Vérifications et décisions restantes (humain, sans publication)
 
-- Application LinkedIn : vérifier au portail développeur si une application existe déjà (aucune trouvée en local le 13 nov) ; produits/scopes visibles, association de Page seulement si requise par le parcours réel, callback OAuth utilisable ; identité et scopes vérifiés sans publier ni téléverser. Ne rien créer avant vérification ; une page entreprise n’est pas intrinsèquement requise pour la publication personnelle.
-- Fournisseurs : l’utilisateur crée le `.env` local (Groq, OpenRouter, Telegram, recherche) ; offre/pays/quota/ZDR et absence de facturation automatique à recontrôler ; Tavily sans PAYG. Aucun modèle figé avant les tests comparatifs.
-- Consentements par usage/destination (Telegram inclus) ; paramètres de rétention, retrieval, RAM images ; seuil d’inactivité 120 h proposé.
-- Qualifier documentairement `/rest/posts`, la version supportée et le parcours image (restriction GET) ; aucun test de création ici.
+**Couvert par treg (14 novembre 2026, ADR-16) :** l'application Developer et le callback OAuth ne sont plus requis — la connexion treg `linkedin` (capability `write`) est active, l'identité (`v2/userinfo` → 200, sub membre) et `w_member_social` sont vérifiés, sans publication.
+
+Restent :
+
+- Fournisseurs : l'utilisateur crée le `.env` local (Groq, OpenRouter, Telegram, recherche) ; offre/pays/quota/ZDR et absence de facturation automatique à recontrôler ; Tavily sans PAYG. Aucun modèle figé avant les tests comparatifs.
+- Consentements par usage/destination (Telegram inclus) ; paramètres de rétention, retrieval, RAM images ; seuil d'inactivité 120 h proposé.
+- Qualification **réelle** (test autorisé distinct, pas documentaire — le catalogue treg l'atteste déjà) : POST `/rest/posts`, version `LinkedIn-Version` supportée, parcours image (initializeUpload → PUT pré-signé → référence média ; restriction GET) ; aucun test de création sans autorisation sur le contenu exact.
+- Conditions et confidentialité du service treg (flux d'appels hébergé, tiers) à accepter explicitement ; gestion de la rotation (reconnexion utilisateur après révocation) à prévoir dans l'adaptateur.
 
 ### Volet B — Préparation locale (code, simulé, sans réseau)
 
@@ -39,7 +43,7 @@ Périmètre précis proposé, à valider avant codage :
 2. **Rappel 10 h** : défaut `DEFAULT_HOUR` 9 → 10 (modifiable), jours/activation inchangés ; tests de créneau existants adaptés.
 3. **Paramètres progressifs partagés** : extension de `settings` (thématiques, ton, public cible, longueur, langue, fréquence, horaires rappels, préférences recherche/images, modèle LLM, fournisseur recherche) ; lecture/écriture via commandes Telegram ; mêmes valeurs servies au tableau de bord. Aucune valeur figée arbitrairement ; règles normatives toujours confirmées séparément.
 4. **Abstraction LLM + comparaison** : contrat `LLMProvider` unique, adaptateurs Groq et OpenRouter (simulés en tests), sélection modèle/fournisseur par paramètre ; harness de comparaison sur tâches identiques (mesure latence/usage, évaluation humaine du français/instructions/style) ; table `llm_benchmarks` proposée. Aucun appel réel ni sélection définitive dans cette phase ; aucun fallback payant.
-5. **Interface de publication** : formaliser le contrat `Publisher` (déjà `SimulatedPublisher`) ; aucun adaptateur réel tant que l’accès n’est pas vérifié.
+5. **Interface de publication** : formaliser le contrat `Publisher` (déjà `SimulatedPublisher`) en prévoyant le futur adaptateur treg : résolution **dynamique** de la connexion `linkedin` health=ok via `treg connections ls` (la rotation treg crée des `linkedin-N` ; jamais de nom ni de secret en dur), preuve de publication = HTTP 201 + URN `x-restli-id`, aucun appel treg mesuré, `NO_PROXY=` vide préfixé à chaque invocation (bug machine). Aucun adaptateur réel tant que la qualification réelle n'est pas faite et autorisée.
 6. **Squelette du tableau de bord local** : serveur HTTP stdlib lié à `127.0.0.1` (port 8000 proposé), sections « configuration générale » et « état système » en lecture/écriture partagée avec SQLite ; pas de second chemin de publication ; pas d’exposition publique. Développement progressif des autres sections aux phases suivantes.
 
 **Gate G1 (local) :** tests sans réseau passants (secrets, rappel 10 h, paramètres partagés, adaptateurs LLM simulés, dashboard loopback) ; aucune action externe ; variables manquantes signalées sans contenu ; aucun modèle sélectionné définitivement ; aucune clé dans le code/logs. Les vérifications du volet A restent explicitement à effectuer ; si blocage publication : mode préparation sans publication, pas un objectif complet atteint.
@@ -105,9 +109,9 @@ Périmètre précis proposé, à valider avant codage :
 
 ## Phase 6 — Publication officielle texte seul
 
-**Dépendances d’entrée :** G2/G5, produits/scopes/identité vérifiés, protocole documentaire cohérent, consentement au test réel. La preuve de création s’obtient en sortie G6.
+**Dépendances d'entrée :** G2/G5, accès treg actif (ADR-16, fait le 14 nov) et qualification réelle du POST `/rest/posts` par un test autorisé distinct, protocole documentaire cohérent, consentement au test réel. La preuve de création s'obtient en sortie G6.
 
-- Adaptateur officiel uniquement : version explicite, en-têtes, règles d’erreur ; préflight et aperçu final ; publication liée au manifeste exact et à l’autorisation consommée.
+- Adaptateur officiel uniquement, via treg (ADR-16) : résolution dynamique de la connexion `linkedin` health=ok, version explicite, en-têtes, règles d'erreur ; préflight et aperçu final ; publication liée au manifeste exact et à l'autorisation consommée ; preuve = 201 + URN `x-restli-id`, jamais le scraping treg.
 - Reçu/URN, `PUBLISHED` + archive exacte en transaction locale ; historique et dernière publication connue actualisés ; notification Telegram séparée et reprenable.
 - Reconnexion OAuth, expiration, refus de scope, rate limiting, `UNKNOWN_OUTCOME` et réconciliation ; aucun retry automatique d’envoi incertain.
 - Premier test de création réelle ici, contenu validé, protections du socle actives ; refus/échec ⇒ capacité non activée.
@@ -120,7 +124,7 @@ Périmètre précis proposé, à valider avant codage :
 
 - Recherche Commons, provenance/licences/restrictions/crédits ; téléchargement et figement **en RAM** (modalité à valider), empreinte, dimensions/MIME bornés.
 - Validation image/absence séparée ; crédit ajouté avant validation texte ; perte du tampon ⇒ nouvel aperçu et approbations image/finale.
-- Upload officiel sans GET de statut non autorisé ; gestion des états/erreurs du protocole vérifié ; aucun binaire persisté.
+- Upload officiel via treg (ADR-16) : initializeUpload → URL pré-signée → PUT du fichier approuvé (curl.exe, pas Invoke-WebRequest) → référence `media` ou `multiImage` (repli media si 422) ; sans GET de statut non autorisé ; gestion des états/erreurs du protocole vérifié ; aucun binaire persisté.
 - Test réel image avec consentement spécifique ; pipeline bloqué ⇒ texte seul après nouvelles validations explicites.
 
 **Gate G7 :** preuve d’utilisation du fichier approuvé et de droits documentés ; aucun média non validé ; aucune archive binaire ; aucune API privée. Pexels/Unsplash/génération : extensions ultérieures seulement.

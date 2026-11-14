@@ -8,7 +8,7 @@ from linkedin_assistant.publisher import SimulatedPublisher
 from conftest import ACCOUNT
 from test_phase2 import FakeClient, msg
 
-NOW = "2026-11-13T08:00:00+00:00"  # 09:00 Africa/Tunis, vendredi
+NOW = "2026-11-13T09:00:00+00:00"  # 10:00 Africa/Tunis, vendredi (défaut rappel 10 h)
 
 
 def declare(conn, at, precision="second", confirmed=None):
@@ -66,7 +66,7 @@ def test_inactivity_once_per_day(conn, client):
     assert len(client.sent) == 1
     reminders.tick(conn, client, 42, NOW)
     assert len(client.sent) == 1
-    reminders.tick(conn, client, 42, "2026-11-14T08:00:00+00:00")
+    reminders.tick(conn, client, 42, "2026-11-14T09:00:00+00:00")
     assert len(client.sent) == 2
 
 
@@ -117,7 +117,7 @@ def test_resume_without_burst(conn, client):
     reminders.set_enabled(conn, True)
     declare(conn, "2026-11-01T08:00:00+00:00")
     for day in range(13, 18):
-        now = f"2026-11-{day:02d}T08:00:00+00:00"
+        now = f"2026-11-{day:02d}T09:00:00+00:00"
         reminders.tick(conn, client, 42, now)
         reminders.tick(conn, client, 42, now)
     assert len(client.sent) == 5

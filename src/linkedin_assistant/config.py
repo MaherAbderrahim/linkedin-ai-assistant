@@ -5,6 +5,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
+from .envfile import EnvFileError, load_env, missing_names
+
 
 class ConfigError(Exception):
     pass
@@ -20,6 +22,8 @@ class Config:
     poll_timeout_seconds: int = 25
     linkedin_account: str = "urn:li:person:UNCONFIGURED"
     telegram_token: str | None = None
+    env_file: Path | None = None
+    missing_env: tuple[str, ...] = ()
 
     @property
     def simulation(self) -> bool:
@@ -44,6 +48,16 @@ def load(path: str | Path) -> Config:
     if not db_path.is_absolute():
         db_path = path.parent / db_path
 
+    # Fichier d'environnement local (facultatif, chargé avant la lecture du jeton).
+    env_name = data.get("env_file", ".env")
+    env_path = Path(env_name)
+    if not env_path.is_absolute():
+        env_path = path.parent / env_path
+    try:
+        load_env(env_path)
+    except EnvFileError as exc:
+        raise ConfigError(f"fichier d'environnement invalide ({env_path.name}) : {exc}") from exc
+
     token = os.environ.get("TELEGRAM_BOT_TOKEN") or None
     if token is not None and not token.strip():
         token = None
@@ -57,4 +71,6 @@ def load(path: str | Path) -> Config:
         poll_timeout_seconds=int(data.get("poll_timeout_seconds", 25)),
         linkedin_account=data.get("linkedin_account", "urn:li:person:UNCONFIGURED"),
         telegram_token=token,
+        env_file=env_path,
+        missing_env=tuple(missing_names()),
     )

@@ -1,14 +1,14 @@
 # Intégrations API et vérification de faisabilité
 
-Date de référence : 13 novembre 2026, Mission 0.6. **Vérification documentaire uniquement : aucun accès authentifié au compte utilisateur, aucun jeton obtenu, aucune publication ni aucun transfert média réalisé.** Le socle local (archive SQLite, import générique, profil, retrieval, rappels) est implémenté et testé sans réseau ; les endpoints ci-dessous restent des spécifications pour les phases futures, pas des appels exécutés. L’archive centrale et l’import indépendant sont décrits dans [l’architecture](TECHNICAL_ARCHITECTURE.md) ; ce document fixe les protocoles et conditions par intégration.
+Date de référence : 13 novembre 2026, Mission 0.6 ; **mise à jour du 14 novembre 2026 (décision treg, ADR-16)**. **Vérification documentaire uniquement : aucune publication ni aucun transfert média réalisé.** Le socle local (archive SQLite, import générique, profil, retrieval, rappels) est implémenté et testé sans réseau ; les endpoints ci-dessous restent des spécifications pour les phases futures, pas des appels exécutés — exception : l'identité LinkedIn a été vérifiée une fois via treg (`v2/userinfo` → 200), sans publication. L'archive centrale et l'import indépendant sont décrits dans [l'architecture](TECHNICAL_ARCHITECTURE.md) ; ce document fixe les protocoles et conditions par intégration.
 
 ## 1. Registre des capacités
 
 | Intégration/capacité | État documentaire | État sur compte utilisateur | Conséquence |
 |---|---|---|---|
 | Telegram : messages et rappels après démarrage du bot | Documentée | NON TESTÉ | Créer/configurer le bot ultérieurement avec autorisation |
-| LinkedIn : OAuth et identification du membre | Documentés ; produits/scopes requis | NON TESTÉ | Vérifier application, produits, redirection, scopes et identité |
-| LinkedIn : publier un texte personnel | `w_member_social` documenté pour création | NON TESTÉ | Endpoint exact à éprouver après consentement spécifique à une publication de test |
+| LinkedIn : OAuth et identification du membre | Documentés ; produits/scopes requis | **ACCÈS VÉRIFIÉ via treg** (14 nov : `v2/userinfo` → 200, `w_member_social`, expiration 2027-01-13) | Secret détenu par treg, jamais localement ; adaptateur à résolution dynamique de connexion |
+| LinkedIn : publier un texte personnel | `w_member_social` documenté pour création ; parcours treg attesté par le catalogue | NON TESTÉ (aucun POST réel) | Endpoint exact à éprouver après consentement spécifique à une publication de test (Phase 6) |
 | LinkedIn : lire l’historique des posts | `r_member_social` restreint | NON TESTÉ, accès non présumé | Import indépendant (originaux utilisateur, skill audité, autre source conforme) comme solution de départ |
 | Archive centrale SQLite et import générique | Contrats internes | IMPLÉMENTÉ localement (tests sans réseau) | Indépendant d’Apify et du droit de lecture ; droits par origine avant persistance |
 | LinkedIn : initialiser/téléverser une image | Documenté avec permissions adaptées | NON TESTÉ | Gate indépendant du texte |
@@ -18,6 +18,7 @@ Date de référence : 13 novembre 2026, Mission 0.6. **Vérification documentair
 | Tavily : recherche basic | Gratuit récurrent documenté | NON TESTÉ | Compte Free sans PAYG, test ultérieur |
 | Commons : recherche et métadonnées | API publique documentée | NON TESTÉ en intégration | Vérifier licences et conditions fichier par fichier |
 | Skill Apify | Fichiers locaux lus | AUDITÉ (documentaire, 13 nov) | Voir APIFY_SKILL_AUDIT.md ; Actors community/PPE ; aucune exécution ; import générique préféré |
+| treg (proxy de credentials) | Catalogue lu, identité vérifiée via connexion `linkedin` | **CONNEXION ACTIVE** (secret côté treg, rotation connue) | Publication via `/rest/posts` (0 $) ; éviter les endpoints mesurés ; preuve = 201 + URN `x-restli-id` |
 | Tableau de bord web local | Architecture proposée | NON IMPLÉMENTÉ | localhost, même SQLite que Telegram ; jamais public sans protection |
 | Génération d’image | Aucune offre compatible établie | NON ACTIVÉ | Hors socle |
 | Oracle Always Free | Offre documentée | NON TESTÉ | Capacité, carte, région, coûts et conditions à valider |
@@ -47,7 +48,9 @@ La documentation consultée affiche `202610` comme version la plus récente de s
 
 Ne pas promettre une approbation automatique de produit, l’absence de conditions de Page ni une disponibilité universelle selon les régions/comptes.
 
-**Vérification de l’existant (13 novembre 2026) :** aucune intégration LinkedIn antérieure trouvée dans l’espace de travail `D:\PFE` — uniquement des scrapers d’offres d’emploi publics (`_work/li_crawl.py`, `li.py`, `li_filter.py`) sans rapport avec la publication, aucune application Developer, aucun `client_id`/secret/jeton. La « méthode précédente » n’existe que dans la documentation. **Action utilisateur :** vérifier au portail développeur si une application existe déjà avant toute création. La publication personnelle `w_member_social` + OIDC ne requiert pas intrinsèquement de page entreprise (LI-9), mais une application Developer reste nécessaire pour l’OAuth. L’interface `Publisher` est abstraite et remplaçable ; simulateur en place jusqu’à l’accès réel. Aucun contournement.
+**Vérification de l'existant (13 novembre 2026) :** aucune intégration LinkedIn antérieure trouvée dans l'espace de travail `D:\PFE` — uniquement des scrapers d'offres d'emploi publics (`_work/li_crawl.py`, `li.py`, `li_filter.py`) sans rapport avec la publication, aucune application Developer, aucun `client_id`/secret/jeton. La « méthode précédente » n'existe que dans la documentation. **Action utilisateur :** vérifier au portail développeur si une application existe déjà avant toute création. La publication personnelle `w_member_social` + OIDC ne requiert pas intrinsèquement de page entreprise (LI-9), mais une application Developer reste nécessaire pour l'OAuth. L'interface `Publisher` est abstraite et remplaçable ; simulateur en place jusqu'à l'accès réel. Aucun contournement.
+
+**Mise à jour du 14 novembre 2026 (treg, ADR-16) :** le parcours retenu n'exige plus d'application Developer propre ni de callback OAuth local. L'accès passe par treg (proxy de credentials hébergé), dont la connexion `linkedin` (capability `write`) a été créée puis reconnectée **par l'utilisateur avec consentement navigateur** après une révocation de rotation. Connexion vérifiée : `treg call linkedin v2/userinfo` → 200, `sub` membre `UkLKzuK9bT`, scope `w_member_social`, expiration 2027-01-13. Le secret reste côté treg ; aucun jeton LinkedIn n'est stocké localement. **Conséquences :** (1) les prérequis 1 à 5 ci-dessus sont couverts par la connexion treg, pas par une application de l'utilisateur ; (2) la rotation périodique de treg crée un nouveau nom `linkedin-N` à chaque reconnexion — **l'adaptateur doit résoudre dynamiquement la connexion `linkedin` health=ok via `treg connections ls`, jamais de nom ni de secret en dur** ; (3) la qualification réelle de `/rest/posts` (POST + image) reste NON TESTÉE et attend une autorisation distincte.
 
 ### 2.3 OAuth, identité et renouvellement
 
@@ -75,7 +78,9 @@ Contrat de contenu : auteur membre, commentaire/texte exact, visibilité approuv
 
 La documentation décrit un succès **201** avec identifiant du post dans **`x-restli-id`**. Conserver l’URN officielle comme preuve ; ne pas fabriquer un permalien si le contrat ne permet pas de le construire de façon fiable. Un échec d’envoi du message de confirmation Telegram ne doit pas relancer le post LinkedIn. [LI-3]
 
-Le guide UGC historique documente une longueur de 3 000 caractères ; c’est une indication utile, pas un test du comptage exact de `/rest/posts`. Vérifier les contraintes actuelles, Unicode, liens et texte alternatif avant recette. [LI-11]
+Le guide UGC historique documente une longueur de 3 000 caractères ; c'est une indication utile, pas un test du comptage exact de `/rest/posts`. Vérifier les contraintes actuelles, Unicode, liens et texte alternatif avant recette. [LI-11]
+
+**Parcours d'appel via treg (14 novembre 2026, catalogue attesté, POST réel NON TESTÉ) :** `treg call linkedin rest/posts --method POST --header "LinkedIn-Version: YYYYMM" --header "X-Restli-Protocol-Version: 2.0.0" --data '@post.json'`. Catalogue : `linkedin.linkedin.user.post.create` → `POST https://api.linkedin.com/rest/posts`, gratuit et non mesuré (OAuth propre du membre via treg). Succès attendu **201, URN dans l'en-tête `x-restli-id`, corps vide** — seule preuve retenue, jamais le scraping treg. Corps JSON fourni par fichier : `author` = `urn:li:person:UkLKzuK9bT` (resource_ref fournie par treg, telle quelle), `commentary` avec échappement backslash des caractères `( ) [ ] { } < > @ | ~`, `visibility` PUBLIC ou CONNECTIONS (annoncée à l'utilisateur avant validation), `distribution` `{"feedDistribution":"MAIN_FEED","targetEntities":[],"thirdPartyDistributionChannels":[]}`, `lifecycleState` PUBLISHED, `isReshareDisabledByAuthor` false. **Contrainte de rotation :** résoudre dynamiquement la connexion `linkedin` health=ok via `treg connections ls` (les reconnexions créent des `linkedin-N`) ; jamais de nom ni de secret en dur. **Bug machine connu :** `NO_PROXY` système contient `[::1],::1` mal parsé par httpx ⇒ préfixer chaque commande treg de `NO_PROXY=` (vide) ; configuration globale inchangée. **Endpoints mesurés à éviter** (crédit d'essai unique de 1,00 $, reste 0,9921 $ au 14 nov) : `treg.linkedin.user.posts`, `treg.linkedin.post.detail`, `treg.google.serp.organic` (~0,008 $ déjà consommés). Recherche web : Tavily, jamais treg. Analytics de posts membres non exposées (réservées Pages).
 
 ### 2.5 Lecture de l’historique et archive centrale
 
@@ -101,7 +106,9 @@ Conséquences :
 
 La documentation mentionne JPG, GIF, PNG et moins de 36 152 320 pixels. Le MVP privilégie une image statique JPEG ou PNG ; taille en octets, dimensions, durée de validité et traitement effectif à vérifier lors du test. Pas de supposition sur un plafond en mégaoctets non relevé. [LI-7]
 
-Le fichier doit être approuvé avant tout transfert LinkedIn. Le transfert média intervient après l’autorisation finale portant sur son empreinte ; il ne constitue pas à lui seul une publication, mais reste un envoi de données à un tiers.
+Le fichier doit être approuvé avant tout transfert LinkedIn. Le transfert média intervient après l'autorisation finale portant sur son empreinte ; il ne constitue pas à lui seul une publication, mais reste un envoi de données à un tiers.
+
+**Parcours image via treg (14 novembre 2026, catalogue attesté, upload réel NON TESTÉ) :** `initializeUpload` → URL de téléversement pré-signée → envoi du fichier par **`curl.exe -X PUT --upload-file`** (pas Invoke-WebRequest, dont le comportement PUT est défaillant ici) → référence `content.media{id}` pour 1 image, `content.multiImage{images:[{id,altText}]}` pour 2+. Formats PNG/JPG/GIF, ≤ 8 Mo selon le catalogue treg (à vérifier au test, la documentation LinkedIn susmentionnée ne donne pas le même plafond). Un **422 sur multiImage** ⇒ repli `media` (image unique) — jamais de retry aveugle. Aucun binaire persisté : le fichier transite uniquement par le tampon approuvé.
 
 ### 2.7 Quotas, versions et erreurs
 
@@ -195,14 +202,15 @@ Constats : skill d’agent pilotant le **CLI Apify** (npm `apify-cli` ≥ 1.5.0,
 
 - [ ] Socle validé ; modalités restantes (seuils, durées, RAM images) et phase suivante explicitement approuvées.
 - [ ] Propriétaire et profil personnel cible confirmés ; utilisation Tunisie/`Africa/Tunis` actée ; conditions tunisiennes/transferts vérifiées pour le traitement réel.
-- [ ] Hôte décidé (PC utilisateur dev/tests) ; coûts indirects assumés ; callback OAuth résolu ; secrets `.env` gérés localement.
-- [ ] Application LinkedIn existante vérifiée au portail (aucune trouvée en local) avant toute création ; produits/scopes visibles ; permissions réellement consenties consignées sans token.
-- [ ] Identité auteur confirmée ; refresh automatique non supposé ; parcours reconnexion prévu.
-- [ ] Droits d’import définis par origine/usage/destination ; skill Apify audité (fait) ; adaptateur éventuel seulement après droits/accord ; complétude de l’historique et limites des rappels expliquées.
+- [ ] Hôte décidé (PC utilisateur dev/tests) ; coûts indirects assumés ; secrets `.env` gérés localement.
+- [x] **Accès publication provisionné via treg (14 nov)** : connexion `linkedin` health=ok créée par l'utilisateur (consentement navigateur), identité et `w_member_social` vérifiés par `v2/userinfo` → 200 ; sans application Developer propre.
+- [ ] Qualification réelle de `/rest/posts` (POST texte puis image) après autorisation distincte sur le contenu exact ; gestion de la rotation treg (résolution dynamique de connexion) vérifiée dans l'adaptateur.
+- [ ] Identité auteur confirmée dans le préflight de chaque publication ; parcours de reconnexion treg (après rotation) prévu.
+- [ ] Droits d'import définis par origine/usage/destination ; skill Apify audité (fait) ; adaptateur éventuel seulement après droits/accord ; complétude de l'historique et limites des rappels expliquées.
 - [ ] Fournisseurs LLM (Groq/OpenRouter) et recherche, clés `.env` fournies, comparaison réalisée, modèle exact choisi après tests, régions/confidentialité/quotas et absence de facturation automatique vérifiés.
-- [ ] Publication texte testée seulement après autorisation séparée du contenu réel ; preuve officielle conservée ; archive atomique vérifiée.
-- [ ] Images non activées avant test indépendant du parcours officiel, des validations de droits et de l’absence d’archive binaire.
-- [ ] Un échec d’accès ne débloque aucun mécanisme non officiel.
+- [ ] Publication texte testée seulement après autorisation séparée du contenu réel ; preuve officielle (201 + URN `x-restli-id`) conservée ; archive atomique vérifiée.
+- [ ] Images non activées avant test indépendant du parcours officiel (initializeUpload → PUT pré-signé → référence média), des validations de droits et de l'absence d'archive binaire.
+- [ ] Un échec d'accès ne débloque aucun mécanisme non officiel ; aucun appel treg mesuré sans autorisation.
 
 ## 8. Sources officielles LinkedIn
 
