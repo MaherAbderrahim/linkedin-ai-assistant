@@ -161,6 +161,20 @@ CREATE TABLE IF NOT EXISTS style_profile (
     valid INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS llm_benchmarks (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    task TEXT NOT NULL,
+    prompt_hash TEXT NOT NULL,
+    latency_ms INTEGER NOT NULL,
+    usage_json TEXT NOT NULL DEFAULT '{}',
+    output_text TEXT NOT NULL,
+    human_score INTEGER,
+    human_notes TEXT,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_history_posts_account_date
     ON history_posts(account, published_at);
 CREATE INDEX IF NOT EXISTS idx_history_versions_norm
@@ -169,3 +183,5 @@ CREATE INDEX IF NOT EXISTS idx_history_sources_expiry
     ON history_sources(expires_at);
 CREATE INDEX IF NOT EXISTS idx_draft_versions_content
     ON draft_versions(content_hash);
+CREATE INDEX IF NOT EXISTS idx_llm_benchmarks_provider
+    ON llm_benchmarks(provider, model);

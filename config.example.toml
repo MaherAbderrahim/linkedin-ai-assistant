@@ -12,3 +12,10 @@ poll_timeout_seconds = 25
 
 # URN du membre LinkedIn, à renseigner après vérification OAuth (phase 6).
 linkedin_account = "urn:li:person:UNCONFIGURED"
+
+# Fichier d'environnement local (facultatif ; absent = aucune variable chargée).
+# Valeurs de secours factices dans .env.example ; le vrai .env est créé par vous.
+# env_file = ".env"
+
+# Tableau de bord local : 127.0.0.1 uniquement, jamais exposé publiquement.
+dashboard_port = 8000

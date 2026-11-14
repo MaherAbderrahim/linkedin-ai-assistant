@@ -24,6 +24,7 @@ class Config:
     telegram_token: str | None = None
     env_file: Path | None = None
     missing_env: tuple[str, ...] = ()
+    dashboard_port: int = 8000
 
     @property
     def simulation(self) -> bool:
@@ -43,6 +44,10 @@ def load(path: str | Path) -> Config:
         raise ConfigError("owner_id doit être un identifiant numérique Telegram positif")
     if not isinstance(chat_id, int) or isinstance(chat_id, bool) or chat_id <= 0:
         raise ConfigError("chat_id doit être un identifiant numérique de chat privé positif")
+
+    dashboard_port = data.get("dashboard_port", 8000)
+    if not isinstance(dashboard_port, int) or isinstance(dashboard_port, bool) or not (1 <= dashboard_port <= 65535):
+        raise ConfigError("dashboard_port doit être un entier entre 1 et 65535")
 
     db_path = Path(data.get("db_path", "data/assistant.db"))
     if not db_path.is_absolute():
@@ -73,4 +78,5 @@ def load(path: str | Path) -> Config:
         telegram_token=token,
         env_file=env_path,
         missing_env=tuple(missing_names()),
+        dashboard_port=dashboard_port,
     )

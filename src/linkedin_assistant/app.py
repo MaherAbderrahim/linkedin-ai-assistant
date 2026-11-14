@@ -31,6 +31,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", default="config.toml", help="fichier de configuration TOML local")
     parser.add_argument("--once", action="store_true", help="un seul cycle de réception puis arrêt")
     parser.add_argument("--local", action="store_true", help="mode interactif local sans réseau (simulation)")
+    parser.add_argument("--dashboard", action="store_true", help="tableau de bord local 127.0.0.1 (aucune publication)")
+    parser.add_argument("--port", type=int, default=None, help="port du tableau de bord (défaut : config dashboard_port)")
     args = parser.parse_args(argv)
 
     for stream in (sys.stdout, sys.stderr):
@@ -57,6 +59,12 @@ def main(argv: list[str] | None = None) -> int:
         from .local import run_local
 
         run_local(conn, config)
+        return 0
+
+    if args.dashboard:
+        from .dashboard import run
+
+        run(config, port=args.port)
         return 0
 
     if config.simulation:

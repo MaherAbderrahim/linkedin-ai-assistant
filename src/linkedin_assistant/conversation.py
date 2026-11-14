@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta, timezone
 
-from . import reminders, store
+from . import prefs, reminders, store
 from .config import Config
 from .db import transaction
 from .hashing import NORM_VERSION, normalized_hash, sha256_text
@@ -51,12 +51,16 @@ class Conversation:
             self._reply(
                 "Assistant LinkedIn personnel. /new crée un brouillon, envoyez ensuite le texte, "
                 "/preview affiche l'aperçu et les validations. /lastpost déclare une publication externe, "
-                "/reminder on|off gère les rappels. Aucune publication sans bouton final dédié. "
+                "/reminder on|off gère les rappels, /settings liste et ajuste les paramètres progressifs. "
+                "Aucune publication sans bouton final dédié. "
                 + SIMULATION_NOTE
             )
             return
         if text == "/status":
             self._reply(self._status())
+            return
+        if text.startswith("/settings"):
+            self._settings_command(text[len("/settings"):].strip())
             return
         if text == "/new":
             draft_id = store.create_draft(self.conn)
@@ -77,7 +81,7 @@ class Conversation:
             self._reminder_command(text[len("/reminder"):].strip())
             return
         if text.startswith("/"):
-            self._reply("Commande inconnue. /start, /new, /preview, /status, /cancel.")
+            self._reply("Commande inconnue. /start, /new, /preview, /status, /cancel, /lastpost, /reminder, /settings.")
             return
         self._save_text(text)
 
@@ -229,10 +233,34 @@ class Conversation:
             "Les rappels utilisent cette date attestée, jamais la date d'import."
         )
 
+    def _settings_command(self, arg: str) -> None:
+        if not arg:
+            self._reply(prefs.display(self.conn))
+            return
+        parts = arg.split(None, 1)
+        key = parts[0].strip()
+        if len(parts) == 1:
+            try:
+                self._reply(prefs.show(self.conn, key))
+            except prefs.PreferencesError as exc:
+                self._reply(f"Réglage refusé ({exc.code}) : {exc}")
+            return
+        try:
+            normalized = prefs.set_value(self.conn, key, parts[1].strip())
+        except prefs.PreferencesError as exc:
+            self._reply(f"Réglage refusé ({exc.code}) : {exc}")
+            return
+        self._reply(f"Réglage enregistré : {key} = {normalized}. Même base que le tableau de bord.")
+
     def _reminder_command(self, arg: str) -> None:
         if arg == "on":
             reminders.set_enabled(self.conn, True)
-            self._reply("Rappels activés : 9 h, tous les jours, seuil 120 h, Africa/Tunis (paramètres proposés).")
+            settings = reminders._settings(self.conn)
+            days = ",".join(str(d) for d in sorted(settings["days"]))
+            self._reply(
+                f"Rappels activés : {settings['hour']} h ({days}), seuil {settings['inactivity_hours']} h, "
+                "Africa/Tunis (paramètres proposés, modifiables via /settings)."
+            )
         elif arg == "off":
             reminders.set_enabled(self.conn, False)
             self._reply("Rappels désactivés. Le bot reste utilisable sans rappels.")
