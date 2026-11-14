@@ -39,6 +39,7 @@ Les règles détaillées sont dans les documents suivants ; aucun fichier `.agen
 - [Services gratuits](docs/FREE_SERVICES_BENCHMARK.md) : sources officielles datées et limites économiques.
 - [Tests](docs/TEST_STRATEGY.md) : invariants et preuves attendues.
 - [Audit du skill Apify](docs/APIFY_SKILL_AUDIT.md) : fonctionnement, Actors LinkedIn, coûts, limites, conformité et modes d’intégration.
+- [Qualification treg](docs/QUALIFICATION_TREG.md) : runbook prêt mais non exécuté pour le premier test réel `/rest/posts` et le parcours image ; chaque étape exige une autorisation distincte.
 
 ## Contraintes universelles
 

@@ -48,6 +48,7 @@ Le **skill Apify a été audité le 13 novembre 2026** (lecture seule de ses fic
 | [FREE_SERVICES_BENCHMARK.md](docs/FREE_SERVICES_BENCHMARK.md) | Comparaison documentaire datée, quotas, pays, confidentialité, cartes et frais possibles |
 | [TEST_STRATEGY.md](docs/TEST_STRATEGY.md) | Tests futurs, invariants de sécurité, pannes, recette humaine et preuves attendues |
 | [APIFY_SKILL_AUDIT.md](docs/APIFY_SKILL_AUDIT.md) | Audit du skill Apify : fonctionnement, Actors, coûts, limites, conformité, intégration |
+| [QUALIFICATION_TREG.md](docs/QUALIFICATION_TREG.md) | Runbook de qualification réelle treg (`/rest/posts` + image), prêt mais non exécuté ; chaque étape exige une autorisation distincte |
 
 Les documents de spécification sont liés ci-dessus. Code : `src/linkedin_assistant/` (bibliothèque standard uniquement), tests dans `tests/`. Installation locale : `python -m venv .venv` puis `.venv/Scripts/python -m pip install -e ".[dev]"` ; tests : `.venv/Scripts/python -m pytest -q` ; démarrage : `.venv/Scripts/linkedin-assistant --config config.toml` (mode simulation sans jeton, voir `config.example.toml`) ; test interactif sans réseau : ajouter `--local`. Secrets : copier `.env.example` vers `.env` (ignoré par git) et renseigner vos clés en local ; ne jamais les coller dans le chat ni les logger.
 
