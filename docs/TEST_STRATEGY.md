@@ -178,16 +178,20 @@ Critères bloquants : fait personnel inventé, citation/source fabriquée, chiff
 - Tests hôte : veille, coupure Internet, redémarrage système, espace disque insuffisant, lancement accidentel d’une seconde instance et restauration.
 - Aucun stress test sur les API gratuites ; tests de charge/concurrence en local uniquement.
 
-## 8bis. Tableau de bord local (à implémenter, tests proposés)
+## 8bis. Tableau de bord local (squelette livré le 14 novembre 2026 — tests implémentés)
 
-Interface `127.0.0.1:8000` servie par le même processus, lisant/écrivant la même base SQLite que Telegram. Aucun test réel d’exposition publique n’est effectué au socle.
+Interface `127.0.0.1:8000` (`dashboard_port`), serveur HTTP stdlib, lisant/écrivant la même base SQLite que Telegram. Aucun test réel d'exposition publique n'est effectué au socle.
 
-- Liaison loopback vérifiée : aucune écoute sur `0.0.0.0` ni interface externe par défaut ; refus de toute requête non locale.
-- Configuration partagée : un paramètre modifié via le tableau de bord est relu identique par Telegram et inversement ; une seule source de vérité, pas de double stockage divergent.
-- Aucune voie de publication : le tableau de bord ne déclenche ni upload ni POST LinkedIn ; toute publication reste soumise au manifeste et à l’autorisation finale unique.
-- Secrets : aucune clé/jeton affiché, renvoyé ou journalisé par l’interface ; les variables manquantes sont signalées par nom.
-- Sections progressives : configuration générale/éditoriale, fournisseurs/modèles/benchmarks, recherches, historique + statuts, état système (services, erreurs, quotas, dernières exécutions) ; chaque section testée sur données simulées.
-- Garde d’exposition : si une exposition Internet est envisagée plus tard, authentification et protection des secrets obligatoires avant tout accès ; non couvert par le socle local.
+Implémentés (tests/test_dashboard.py, 142 tests au total au 14 nov) :
+
+- Rendu pur testable sans socket : `/` (index), `/config` (registre `prefs`, mêmes validations que `/settings` Telegram), `/state` (compteurs, rappels, variables absentes par noms seuls), `/bench` (lecture seule), 404/405.
+- Configuration partagée : un réglage posé via le tableau de bord est relu identique par Telegram (même table `settings`) ; valeurs invalides et clés inconnues refusées (400, échec conservateur).
+- Aucune voie de publication : rien ne publie ni ne consomme d'approbation ; énoncé affiché sur la page d'état.
+- Secrets : aucune clé/jeton affiché ; variables manquantes signalées par noms seuls.
+- Échappement HTML des valeurs de paramètres (test d'injection `<script>`).
+- Liaison loopback vérifiée en test réel : serveur éphémère (port 0) sur 127.0.0.1, requête HTTP locale 200 ; jamais d'écoute externe par défaut.
+
+Reste proposé (phases suivantes) : sections éditoriale/IA/recherches (Phase 5), état système complet (Phase 8) ; garde d'exposition Internet : authentification et protection des secrets obligatoires avant tout accès, non couvert par le socle local.
 
 ## 9. Recette de bout en bout autorisée
 

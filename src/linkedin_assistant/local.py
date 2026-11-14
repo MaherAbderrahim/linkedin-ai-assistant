@@ -33,8 +33,8 @@ def run_local(conn, config, inp=None, out=None) -> None:
     conversation = Conversation(conn, config, client, SimulatedPublisher())
     print(
         "Mode local interactif — aucune action réseau, publication simulée.\n"
-        "Commandes : /new /preview /status /cancel ; texte libre = révision ; "
-        "numéro = bouton affiché ; 'quit' pour sortir.",
+        "Commandes : /new /preview /status /cancel /lastpost /reminder /settings ; "
+        "texte libre = révision ; numéro = bouton affiché ; 'quit' pour sortir.",
         file=out,
     )
     while True:

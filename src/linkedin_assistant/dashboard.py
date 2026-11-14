@@ -7,7 +7,7 @@ import urllib.parse
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from . import prefs, store
+from . import llm, prefs, store
 from .config import Config
 from .db import connect
 
@@ -26,7 +26,7 @@ _PAGE = """<!doctype html>
 <head><meta charset="utf-8"><title>Assistant LinkedIn — {title}</title></head>
 <body>
 <h1>Assistant LinkedIn — tableau de bord local</h1>
-<nav><a href="/">Accueil</a> · <a href="/config">Configuration générale</a> · <a href="/state">État système</a></nav>
+<nav><a href="/">Accueil</a> · <a href="/config">Configuration générale</a> · <a href="/state">État système</a> · <a href="/bench">Benchmarks LLM</a></nav>
 {body}
 <p><em>Lié à 127.0.0.1 — ne jamais exposer publiquement sans authentification.
 Aucune publication depuis ce tableau de bord.</em></p>
@@ -46,7 +46,8 @@ def render(conn: sqlite3.Connection, path: str, method: str = "GET", form: dict 
             "<ul><li><a href=\"/config\">Configuration générale</a> — paramètres progressifs"
             " partagés avec Telegram (mêmes validations).</li>"
             "<li><a href=\"/state\">État système</a> — brouillons, intents, archive, rappels,"
-            " benchmarks, variables d'environnement absentes (noms seuls).</li></ul>"
+            " benchmarks, variables d'environnement absentes (noms seuls).</li>"
+            "<li><a href=\"/bench\">Benchmarks LLM</a> — lecture seule ; l'évaluation reste humaine.</li></ul>"
         )
         return 200, _PAGE.format(title="Accueil", body=body)
     if path == "/config":
@@ -57,6 +58,10 @@ def render(conn: sqlite3.Connection, path: str, method: str = "GET", form: dict 
         if method != "GET":
             return 405, _PAGE.format(title="Erreur", body="<p>Méthode non autorisée.</p>")
         return 200, _PAGE.format(title="État système", body=_state_body(conn, missing_env))
+    if path == "/bench":
+        if method != "GET":
+            return 405, _PAGE.format(title="Erreur", body="<p>Méthode non autorisée.</p>")
+        return 200, _PAGE.format(title="Benchmarks LLM", body=_bench_body(conn))
     return 404, _PAGE.format(title="Introuvable", body="<p>Page inconnue.</p>")
 
 
@@ -125,6 +130,44 @@ def _state_body(conn: sqlite3.Connection, missing_env: tuple[str, ...] = ()) -> 
 <p>Publication LinkedIn : aucune publication possible depuis ce tableau de bord ;
 les validations et l'autorisation finale restent dans Telegram.</p>"""
     return body
+
+
+def _bench_body(conn: sqlite3.Connection) -> str:
+    """Benchmarks LLM en lecture seule : résumés et sorties à évaluer humainement."""
+    rows = conn.execute(
+        "SELECT id, provider, model, task, latency_ms, human_score, output_text, created_at "
+        "FROM llm_benchmarks ORDER BY created_at DESC LIMIT 50"
+    ).fetchall()
+    if not rows:
+        return (
+            "<p>Aucun benchmark enregistré. Le harness (llm.run_benchmark) les crée ;"
+            " aucun appel réel : adaptateurs simulés uniquement.</p>"
+        )
+    summary = []
+    for row in llm.results(conn):
+        if row["avg_human_score"] is None:
+            human = "—"
+        else:
+            human = f'{row["avg_human_score"]:.1f}'
+        summary.append(
+            f"<li><code>{_esc(row['provider'])}/{_esc(row['model'])}</code> — "
+            f"{row['runs']} exécution(s), latence moy. {row['avg_latency_ms']:.1f} ms, "
+            f"score humain moy. {human}</li>"
+        )
+    items = []
+    for row in rows:
+        score = row["human_score"] if row["human_score"] is not None else "non évalué"
+        items.append(
+            f"<li><code>{_esc(row['provider'])}/{_esc(row['model'])}</code> · tâche "
+            f"{_esc(row['task'])} · {_esc(row['latency_ms'])} ms · score : {_esc(score)}"
+            f"<br><pre>{_esc(row['output_text'])}</pre></li>"
+        )
+    return (
+        "<h2>Benchmarks LLM (lecture seule)</h2>"
+        "<p>Aucun appel réseau : adaptateurs simulés ; l'évaluation du français, des"
+        " instructions et du style reste humaine.</p>"
+        "<ul>" + "".join(summary) + "</ul><ol>" + "".join(items) + "</ol>"
+    )
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):

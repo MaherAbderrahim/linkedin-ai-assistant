@@ -100,6 +100,22 @@ def test_unknown_path_and_bad_method(tmp_path):
         conn.close()
 
 
+def test_bench_page_empty_and_filled(tmp_path):
+    from linkedin_assistant import llm
+
+    config, conn = make(tmp_path)
+    try:
+        code, page = dashboard.render(conn, "/bench")
+        assert code == 200 and "Aucun benchmark" in page
+        ids = llm.run_benchmark(conn, [llm.provider("groq", "a")], [("draft", "prompt-bench")])
+        llm.score(conn, ids[0], 4, "correct")
+        code, page = dashboard.render(conn, "/bench")
+        assert code == 200
+        assert "groq/a" in page and "4" in page and "prompt-bench" in page[:2000]
+    finally:
+        conn.close()
+
+
 def test_server_serves_loopback(tmp_path):
     config, conn = make(tmp_path)
     conn.close()
