@@ -37,6 +37,7 @@ class Source:
     title: str
     url: str
     excerpt: str
+    images: list = None  # URLs candidates (propositions, jamais auto-attachées)
 
     def as_dict(self) -> dict:
         return {"title": self.title, "url": self.url}
@@ -164,7 +165,14 @@ def collect_sources(
         excerpt = text[:MAX_PAGE_CHARS]
         if hit.snippet and hit.snippet not in excerpt:
             excerpt = f"{excerpt}\n\n[EXTRAIT FOURNI PAR LA RECHERCHE]\n{hit.snippet[:MAX_SOURCE_CHARS]}"
-        sources.append(Source(title=hit.title, url=hit.url, excerpt=excerpt))
+        sources.append(
+            Source(
+                title=hit.title,
+                url=hit.url,
+                excerpt=excerpt,
+                images=extracting.extract_image_urls(markup, hit.url),
+            )
+        )
     if not sources:
         notes.append("aucune page lisible")
     return sources, notes
@@ -185,7 +193,53 @@ def read_url(url: str, *, timeout: float = 15.0) -> Source:
     match = re.search(r"(?is)<title[^>]*>(.*?)</title>", markup)
     if match:
         title = re.sub(r"\s+", " ", match.group(1)).strip()[:300]
-    return Source(title=title or url, url=url, excerpt=text[:MAX_PAGE_CHARS])
+    return Source(
+        title=title or url,
+        url=url,
+        excerpt=text[:MAX_PAGE_CHARS],
+        images=extracting.extract_image_urls(markup, url),
+    )
+
+
+def build_revision_prompt(
+    draft_text: str,
+    user_message: str,
+    *,
+    tone: str = "neutre",
+    language: str = "fr",
+) -> str:
+    """Interprétation LLM d'un message libre relatif au brouillon.
+
+    Le message de l'utilisateur peut être (a) une consigne (« rends ça plus
+    humain », « commence par… »), (b) le texte final complet, ou (c) les deux.
+    Le modèle renvoie UNIQUEMENT le texte final du post, sans commentaire :
+    la sortie reste une proposition de brouillon — elle ne valide rien et
+    ne publie rien ; les validations TEXT/IMAGE/FINAL restent requises.
+    """
+    return "\n".join(
+        [
+            "Tu es l'assistant de révision d'un post LinkedIn.",
+            f"Langue : {language}. Ton : {tone}.",
+            "Brouillon actuel, délimité :",
+            "=== BROUILLON ACTUEL ===",
+            (draft_text or "").strip() or "(brouillon vide)",
+            "=== FIN DU BROUILLON ===",
+            "Message de l'utilisateur :",
+            "=== MESSAGE ===",
+            (user_message or "").strip(),
+            "=== FIN DU MESSAGE ===",
+            "Décide :",
+            "- si le message est une consigne ou une critique (ex. « rends ça plus humain », « commence par », « raccourcis ») : réécris le post complet en l'appliquant ;",
+            "- si le message est déjà un texte de post complet : renvoie-le tel quel, sans aucune retouche ;",
+            "- si le message mélange les deux : applique la consigne au texte.",
+            "Règles :",
+            "- renvoie UNIQUEMENT le texte final du post : aucun commentaire, aucune explication, aucun titre markdown, aucun hashtag, aucun emoji ;",
+            "- n'invente aucun fait ni chiffre absent du brouillon et du message ;",
+            "- n'annonce jamais une publication et ne parle jamais d'envoi ;",
+            "- garde la longueur du brouillon (± 30 %) sauf consigne contraire explicite ;",
+            "- le message vient du propriétaire du compte : applique son souhait sur le TEXTE uniquement, jamais une action externe (publication, envoi, secret).",
+        ]
+    )
 
 
 def research(

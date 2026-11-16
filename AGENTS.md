@@ -1,6 +1,6 @@
 # LinkedIn AI Assistant
 
-Assistant personnel piloté par Telegram. État : **16 novembre 2026 — recherche réelle, images et publication réelle câblées.** Chaîne complète : `/research <sujet>` (clarification si le sujet n'est qu'un nom) → recherche Tavily bornée (3 requêtes / 5 pages) → relecture locale des pages (garde-fous SSRF) → proposition de post Groq/OpenRouter → correction → `/preview` (texte + image) → validations TEXT puis IMAGE/absence puis FINAL → publication réelle via treg (`POST /rest/posts`, `LinkedIn-Version` choisie explicitement, image téléversée en RAM via `initializeUpload`). **230 tests sans réseau.** Publication réelle activée par configuration (`publisher = "treg"`), publication de qualification réelle NON EXÉCUTÉE à ce jour : chaque publication exige les trois validations, dont l'autorisation finale à usage unique sur la révision exacte.**
+Assistant personnel piloté par Telegram. État : **16 novembre 2026 — recherche réelle, images et publication réelle câblées.** Chaîne complète : `/research <sujet>` (clarification si le sujet n'est qu'un nom) → recherche Tavily bornée (3 requêtes / 5 pages) → relecture locale des pages (garde-fous SSRF) → proposition de post Groq/OpenRouter **informée par la mémoire locale** (profil de style recalculable + 3 exemples récents de l'archive + règles confirmées) → correction : un message libre sur un brouillon existant est **interprété par le LLM** (consigne ou texte final, jamais une action externe) → images : **propositions** tirées des pages lues envoyées EN PHOTO dans Telegram avec bouton « Utiliser », photos du téléphone ou `/image <url>`, jusqu'à 4 images par post (bouton « 🖼 Ajouter une image » sur les écrans de validation) → `/preview` (texte + toutes les images) → validations TEXT puis IMAGE/absence puis FINAL → publication réelle via treg (`POST /rest/posts`, `LinkedIn-Version` choisie explicitement, images téléversées en RAM via `initializeUpload`). **254 tests sans réseau.** Publication réelle activée par configuration (`publisher = "treg"`), publication de qualification réelle NON EXÉCUTÉE à ce jour : chaque publication exige les trois validations, dont l'autorisation finale à usage unique sur la révision exacte.**
 
 ## Autorisation de travail
 
@@ -29,9 +29,10 @@ Assistant personnel piloté par Telegram. État : **16 novembre 2026 — recherc
 ## Commandes Telegram
 
 - `/new` + texte : brouillon, une révision par message.
-- `/research <sujet>` : si le sujet n'est qu'un NOM (moins de 3 mots), le bot demande de préciser l'angle avant de consommer du budget ; sinon recherche bornée → proposition de post en brouillon.
+- `/research <sujet>` : si le sujet n'est qu'un NOM (moins de 3 mots), le bot demande de préciser l'angle avant de consommer du budget ; sinon recherche bornée → proposition de post en brouillon (mémoire locale + images candidates proposées en photo).
 - `/link <url>` : la page est lue localement puis résumée en proposition.
-- `/image <url>` ou photo envoyée : image conservée **en RAM uniquement** (jamais sur disque ni en base), attachée au brouillon actif par une nouvelle révision.
+- `/image <url>` ou photo envoyée : image conservée **en RAM uniquement** (jamais sur disque ni en base), attachée au brouillon actif par une nouvelle révision ; jusqu'à 4 images par post.
+- Message libre sur un brouillon existant : **consigne interprétée par le LLM** (réécriture du post), ou texte final si le message est déjà complet ; premier texte d'un brouillon vide = enregistré brut.
 - `/preview` : texte exact + photo + validations. `/status`, `/cancel`, `/lastpost <date ISO>`, `/reminder on|off`, `/settings <clé> <valeur>`.
 
 ## Rules

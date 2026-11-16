@@ -49,6 +49,15 @@ def last_button(client):
     return markup["inline_keyboard"][0][0]["callback_data"]
 
 
+def button_data(client, prefix):
+    """Premier bouton dont le callback_data commence par `prefix`."""
+    markup = client.sent[-1][2]
+    for row in markup["inline_keyboard"]:
+        if row[0]["callback_data"].startswith(prefix):
+            return row[0]["callback_data"]
+    raise AssertionError(f"bouton {prefix} introuvable : {markup}")
+
+
 @pytest.fixture()
 def client():
     return FakeClient()
@@ -73,8 +82,8 @@ def drive_to_final(conv, client, text="Mon post exact."):
     conv.handle(msg("/new", uid=1))
     conv.handle(msg(text, uid=2))
     conv.handle(msg("/preview", uid=3))
-    conv.handle(cb(last_button(client), uid=4))
-    conv.handle(cb(last_button(client), uid=5))
+    conv.handle(cb(last_button(client), uid=4))  # approbation du texte
+    conv.handle(cb(button_data(client, "noimg:"), uid=5))  # sans image
     return last_button(client)
 
 

@@ -8,7 +8,7 @@ from linkedin_assistant.local import run_local
 def test_local_repl_full_flow(tmp_path):
     config = Config(owner_id=42, chat_id=42, db_path=tmp_path / "local.db")
     conn = db.connect(config.db_path)
-    inp = io.StringIO("/new\nMon post local.\n/preview\n1\n1\n1\nquit\n")
+    inp = io.StringIO("/new\nMon post local.\n/preview\n1\n2\n1\nquit\n")
     out = io.StringIO()
     run_local(conn, config, inp, out)
     printed = out.getvalue()

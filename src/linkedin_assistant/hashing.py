@@ -20,7 +20,13 @@ def content_fingerprint(manifest: dict) -> str:
         "account": manifest["account"],
         "text": manifest["text"],
         "visibility": manifest["visibility"],
+        # image (héritage, révisions anciennes) ; images = liste multi-images.
         "image_hash": (manifest.get("image") or {}).get("sha256"),
+        "image_hashes": [
+            entry.get("sha256")
+            for entry in (manifest.get("images") or [])
+            if isinstance(entry, dict)
+        ],
     }
     return sha256_text(canonical_json(payload))
 

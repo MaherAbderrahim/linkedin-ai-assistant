@@ -290,13 +290,21 @@ class TregPublisher(Publisher):
             "isReshareDisabledByAuthor": False,
         }
         media = manifest.get("media")
-        planned = manifest.get("image")
-        if planned and not media:
-            # Image approuvée mais pas encore téléversée : le téléversement
+        planned = manifest.get("image")  # héritage : image unique
+        planned_list = manifest.get("images")  # multi-images (jusqu'à 4)
+        if not media and (planned or planned_list):
+            # Images approuvées mais pas encore téléversées : le téléversement
             # officiel a lieu ICI, après consommation de l'autorisation finale
             # (donc jamais avant), et seulement si les octets approuvés sont
-            # encore en RAM.
-            media = self._upload_planned_image(planned, account)
+            # encore en RAM. Ordre de la liste conservé.
+            # NB : si un échec survient au 2e upload, le 1er peut exister côté
+            # LinkedIn (URN orphelin, jamais de post) : aucun envoi, refus
+            # documenté, nouvelle autorisation requise.
+            if planned_list:
+                entries = [self._upload_planned_image(entry, account) for entry in planned_list]
+                media = {"images": entries} if len(entries) > 1 else entries[0]
+            else:
+                media = self._upload_planned_image(planned, account)
         content = self._build_content(media)
         if content:
             payload["content"] = content

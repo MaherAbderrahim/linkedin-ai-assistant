@@ -160,6 +160,46 @@ def fetch(url: str, *, timeout: float = 10.0, max_bytes: int = MAX_BYTES) -> str
 
 
 IMAGE_CONTENT_TYPES = ("image/png", "image/jpeg", "image/jpg", "image/gif")
+_META_IMAGE_RE = re.compile(
+    r"(?is)<meta[^>]+(?:property|name)\s*=\s*[\"'](?:og:image|twitter:image|twitter:image:src)[\"'][^>]*>"
+)
+_META_CONTENT_RE = re.compile(r"(?is)content\s*=\s*[\"']([^\"']+)[\"']")
+_IMG_SRC_RE = re.compile(r"(?is)<img[^>]+src\s*=\s*[\"']([^\"']+)[\"']")
+
+
+def extract_image_urls(markup: str, base_url: str, *, limit: int = 6) -> list[str]:
+    """Candidates d'images d'une page lue : og:image d'abord, puis les <img>.
+
+    Le HTML lu est une donnée NON fiable : ces URLs ne sont que des
+    PROPOSITIONS. Chacune est revérifiée avant tout téléchargement
+    (`fetch_binary` : garde-fous SSRF + signature binaire + taille bornée).
+    Exclus : URIs de données, SVG (signature non vérifiable ici), URLs non
+    publiques, doublons. Résolution relative contre la page elle-même.
+    """
+    if not markup or not base_url:
+        return []
+    candidates: list[str] = []
+    for meta in _META_IMAGE_RE.findall(markup)[:limit]:
+        match = _META_CONTENT_RE.search(meta)
+        if match:
+            candidates.append(match.group(1).strip())
+    candidates.extend(match.group(1).strip() for match in _IMG_SRC_RE.finditer(markup))
+    urls: list[str] = []
+    for raw in candidates:
+        url = urllib.parse.urljoin(base_url, html_module.unescape(raw))
+        path = url.lower().split("?", 1)[0].split("#", 1)[0]
+        if not path.startswith(("http://", "https://")):
+            continue
+        if path.endswith(".svg"):
+            continue
+        if not is_public_http_url(url):
+            continue
+        if url not in urls:
+            urls.append(url)
+        if len(urls) >= limit:
+            break
+    return urls
+
 _IMAGE_SIGNATURES = (
     (b"\x89PNG\r\n\x1a\n", "image/png"),
     (b"\xff\xd8\xff", "image/jpeg"),

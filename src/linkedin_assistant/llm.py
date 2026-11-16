@@ -106,7 +106,7 @@ class HTTPChatProvider(LLMProvider):
         base_url: str,
         *,
         system_prompt: str = "",
-        max_tokens: int = 1200,
+        max_tokens: int = 2048,
         temperature: float = 0.7,
         extra_headers: dict | None = None,
         timeout: float = DEFAULT_TIMEOUT,

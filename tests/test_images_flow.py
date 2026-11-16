@@ -12,7 +12,7 @@ from linkedin_assistant import media, store
 from linkedin_assistant.conversation import Conversation
 from linkedin_assistant.publisher import SimulatedPublisher
 
-from test_phase2 import cb, last_button, msg
+from test_phase2 import button_data, cb, last_button, msg
 
 
 PNG = (
@@ -39,8 +39,8 @@ class FakeClient:
         self.sent.append((chat_id, text, reply_markup))
         return {"message_id": len(self.sent)}
 
-    def send_photo(self, chat_id, photo, caption=None):
-        self.photos.append((chat_id, photo, caption))
+    def send_photo(self, chat_id, photo, caption=None, content_type="image/png"):
+        self.photos.append((chat_id, photo, caption, content_type))
         return {"message_id": len(self.photos)}
 
     def answer_callback(self, callback_query_id, text=None):
@@ -85,9 +85,9 @@ def test_photo_creates_revision_with_image_metadata(conn, conv, buffer, client):
         "JOIN drafts d ON d.id = v.draft_id AND d.current_revision = v.revision"
     ).fetchone()
     manifest = json.loads(row["manifest_json"])
-    assert manifest["image"]["sha256"] == asset.sha256
-    assert manifest["image"]["token"] == asset.token
-    assert "data" not in manifest["image"]
+    assert manifest["images"][0]["sha256"] == asset.sha256
+    assert manifest["images"][0]["token"] == asset.token
+    assert "data" not in manifest["images"][0]
 
 
 def test_image_changes_content_fingerprint(conn, conv, buffer, client):
@@ -155,9 +155,10 @@ def test_no_image_approval_kind_when_no_image(conn, conv, client):
     conv.handle(msg("/new", uid=1))
     conv.handle(msg("Texte simple.", uid=2))
     conv.handle(msg("/preview", uid=3))
-    conv.handle(cb(last_button(client), uid=4))
-    assert last_button(client).startswith("noimg:")
-    conv.handle(cb(last_button(client), uid=5))
+    conv.handle(cb(last_button(client), uid=4))  # texte
+    # Un bouton d'ajout d'image est proposé AVANT la validation « sans image ».
+    assert button_data(client, "imgadd:") is not None
+    conv.handle(cb(button_data(client, "noimg:"), uid=5))
     kinds = {r["kind"] for r in conn.execute("SELECT kind FROM approvals")}
     assert "NO_IMAGE" in kinds
     assert "IMAGE" not in kinds

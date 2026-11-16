@@ -20,7 +20,10 @@ from .extracting import IMAGE_CONTENT_TYPES, sniff_image
 # redémarrage. C'est un comportement attendu, pas une panne.
 
 MAX_IMAGE_BYTES = 8_000_000  # 8 Mio : limite de téléversement LinkedIn
-MAX_IMAGES_PER_DRAFT = 4
+MAX_IMAGES_PER_DRAFT = 4  # limite par POST LinkedIn (appliquée à l'attachement)
+# Le tampon couvre AUSSI les images proposées (RAM, jamais attachées sans
+# clic) : la limite du tampon dépasse donc la limite par post.
+MAX_BUFFERED_IMAGES = 8
 
 
 class MediaError(Exception):
@@ -58,7 +61,7 @@ class ImageAsset:
 class ImageBuffer:
     """Stockage d'images en RAM, borné, sans persistance."""
 
-    def __init__(self, max_images: int = MAX_IMAGES_PER_DRAFT, max_bytes: int = MAX_IMAGE_BYTES):
+    def __init__(self, max_images: int = MAX_BUFFERED_IMAGES, max_bytes: int = MAX_IMAGE_BYTES):
         self._assets: dict[str, ImageAsset] = {}
         self._max_images = max_images
         self._max_bytes = max_bytes

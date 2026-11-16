@@ -86,10 +86,11 @@ class Conversation:
             self._reply(
                 "Assistant LinkedIn personnel. /new crée un brouillon, envoyez ensuite le texte, "
                 "/preview affiche l'aperçu et les validations. /research <sujet> propose un post "
-                "recherché, /link <url> part d'un article, envoyez une photo pour illustrer, "
-                "/lastpost déclare une publication externe, /reminder on|off gère les rappels, "
-                "/settings liste et ajuste les paramètres progressifs. "
-                "Aucune publication sans bouton final dédié. "
+                "recherché (images candidates proposées en photo), /link <url> part d'un article, "
+                "envoyez une photo pour illustrer, un message libre est interprété par le modèle "
+                "quand un brouillon existe, /lastpost déclare une publication externe, "
+                "/reminder on|off gère les rappels, /settings liste et ajuste les paramètres "
+                "progressifs. Aucune publication sans bouton final dédié. "
                 + ("" if self._is_real_publisher() else SIMULATION_NOTE)
             )
             return
@@ -109,6 +110,7 @@ class Conversation:
             return
         if text == "/cancel":
             store.set_setting(self.conn, "active_draft", "")
+            store.set_setting(self.conn, "image_mode", "")
             self._reply("Brouillon actif désélectionné (il reste en base, rien n'est supprimé).")
             return
         if text.startswith("/lastpost"):
@@ -206,27 +208,56 @@ class Conversation:
             "audience": pref("editorial_audience", "") or "",
         }
 
-    def _style_context(self) -> str:
-        """Profil de style descriptif (recalculable), jamais une règle normative."""
-        try:
-            from . import profile as profile_mod
+    def _memory_context(self, topic: str = "") -> str:
+        """Contexte de style tiré de la BASE LOCALE : profil descriptif,
+        exemples récents de l'archive et règles confirmées.
 
-            data = profile_mod.get(self.conn, self.config.linkedin_account)
+        Bornes : 3 posts × 900 caractères, 5 règles, profil ≤ 4 000 caractères.
+        Descriptif et recalculable, jamais une règle normative non confirmée :
+        le LLM s'en inspire, il ne reçoit aucun ordre de publication.
+        """
+        from . import profile as profile_mod, retrieval as retrieval_mod
+
+        account = self.config.linkedin_account
+        parts: list[str] = []
+        try:
+            data = profile_mod.get(self.conn, account)
+            if data is None or data.get("stale"):
+                profile_mod.refresh(self.conn, account)
+                data = profile_mod.get(self.conn, account)
+            if data:
+                prof = data.get("profile") or {}
+                length = prof.get("length") or {}
+                terms = [term for term, _count in (prof.get("top_terms") or [])[:12]]
+                bits = []
+                if length.get("avg"):
+                    bits.append(f"longueur moyenne observée : {length['avg']} caractères")
+                if terms:
+                    bits.append("termes récurrents : " + ", ".join(terms))
+                if bits:
+                    parts.append(
+                        f"STYLE OBSERVÉ (archive locale, {prof.get('posts', 0)} publication(s)) : "
+                        + " ; ".join(bits)
+                    )
         except Exception:  # noqa: BLE001 — le style est un bonus, jamais un bloquant
-            return ""
-        if not data:
-            return ""
-        prof = data.get("profile") or {}
-        length = prof.get("length") or {}
-        terms = [term for term, _count in (prof.get("top_terms") or [])[:12]]
-        if not terms and not length:
-            return ""
-        parts = []
-        if length.get("avg"):
-            parts.append(f"longueur moyenne observée : {length['avg']} caractères")
-        if terms:
-            parts.append("termes récurrents : " + ", ".join(terms))
-        return " ; ".join(parts)
+            pass
+        try:
+            selected = retrieval_mod.select(
+                self.conn, account, topic=(topic or None), limit=3, max_chars=12000
+            )
+            for index, post in enumerate(selected["posts"][:3], start=1):
+                sample = (post.get("text") or "").strip()[:900]
+                if sample:
+                    parts.append(
+                        f"EXEMPLE RÉCENT DE L'ARCHIVE ({post.get('published_at') or 'date inconnue'}), "
+                        f"à imiter sans le recopier :\n{sample}"
+                    )
+            rules = selected["rules"][:5]
+            if rules:
+                parts.append("RÈGLES CONFIRMÉES PAR L'UTILISATEUR :\n- " + "\n- ".join(rules))
+        except Exception:  # noqa: BLE001
+            pass
+        return "\n\n".join(parts)
 
     def _search(self):
         if self._search_provider is not None:
@@ -280,7 +311,7 @@ class Conversation:
                 language=settings["language"],
                 length=settings["length"],
                 audience=settings["audience"],
-                style_context=self._style_context(),
+                style_context=self._memory_context(topic),
             )
         except research_mod.ResearchError as exc:
             self._reply(f"Recherche impossible ({exc.code}) : {exc}")
@@ -295,9 +326,13 @@ class Conversation:
         sources = "\n".join(f"- {s.title} — {s.url}" for s in outcome.sources)
         self._reply(
             f"Proposition (brouillon {draft_id[:8]}) :\n\n{outcome.text}\n\n"
-            f"Sources lues :\n{sources}\n\n"
-            "Corrigez le texte librement (chaque message crée une révision), "
-            "ajoutez une photo si vous le souhaitez, puis /preview pour valider."
+            f"Sources lues :\n{sources}"
+        )
+        self._propose_images(outcome.sources)
+        self._reply(
+            "Corrigez le texte librement : une consigne (« rends ça plus humain », "
+            "« commence par… ») sera interprétée par le modèle, qui réécrira le post. "
+            "Ajoutez une image si vous le souhaitez, puis /preview pour valider."
         )
 
     def _run_link(self, url: str) -> None:
@@ -315,7 +350,7 @@ class Conversation:
             language=settings["language"],
             length=settings["length"],
             audience=settings["audience"],
-            style_context=self._style_context(),
+            style_context=self._memory_context(source.title),
         )
         from . import llm as llm_mod
 
@@ -331,8 +366,12 @@ class Conversation:
         draft_id = self._create_draft(text)
         self._reply(
             f"Proposition (brouillon {draft_id[:8]}) :\n\n{text}\n\n"
-            f"Source : {source.title} — {source.url}\n\n"
-            "Corrigez si besoin, ajoutez une photo, puis /preview pour valider."
+            f"Source : {source.title} — {source.url}"
+        )
+        self._propose_images([source])
+        self._reply(
+            "Corrigez librement (une consigne sera interprétée par le modèle), "
+            "ajoutez une image, puis /preview pour valider."
         )
 
     def _create_draft(self, text: str) -> str:
@@ -343,12 +382,16 @@ class Conversation:
 
     # ------------------------------------------------------------------ images
 
-    def _manifest(self, text: str, image: dict | None = None) -> dict:
-        return {
+    MAX_IMAGES_PER_DRAFT = media.MAX_IMAGES_PER_DRAFT
+
+    def _manifest(self, text: str, images: list | None = None) -> dict:
+        manifest = {
             "account": self.config.linkedin_account,
             "visibility": self._visibility(),
-            "image": image,
         }
+        if images:
+            manifest["images"] = images
+        return manifest
 
     def _visibility(self) -> str:
         """PUBLIC ou CONNECTIONS, choisi par paramètre (jamais implicite)."""
@@ -357,6 +400,84 @@ class Conversation:
         except prefs.PreferencesError:
             value = None
         return "CONNECTIONS" if (value or "public").strip().lower() == "connections" else "PUBLIC"
+
+    def _propose_images(self, sources: list) -> None:
+        """Propose jusqu'à 2 images tirées des pages lues.
+
+        Les images sont envoyées EN IMAGE dans Telegram (pas un lien) avec un
+        bouton « Utiliser ». Rien n'est attaché sans clic explicite ; les
+        octets restent en RAM et chaque candidat passe les garde-fous SSRF
+        et la signature binaire (`fetch_binary`). Une proposition qui échoue
+        n'est jamais bloquante.
+        """
+        urls: list[str] = []
+        for source in sources:
+            for url in (getattr(source, "images", None) or []):
+                if url not in urls:
+                    urls.append(url)
+        if not urls:
+            return
+        assets = []
+        for url in urls:
+            try:
+                data, content_type = extracting.fetch_binary(url, timeout=15.0)
+                asset = self.buffer.add(
+                    data,
+                    content_type=content_type,
+                    filename=urlparse(url).path.rsplit("/", 1)[-1] or "image",
+                    source="proposed",
+                )
+            except Exception:  # noqa: BLE001 — proposition, jamais un bloquant
+                continue
+            assets.append(asset)
+            if len(assets) >= 2:
+                break
+        if not assets:
+            return
+        sent = 0
+        for asset in assets:
+            try:
+                self.client.send_photo(
+                    self.config.chat_id,
+                    asset.data,
+                    caption=f"Image proposée par la recherche ({asset.content_type}, "
+                    f"empreinte {asset.sha256[:12]})",
+                    content_type=asset.content_type,
+                )
+                sent += 1
+            except Exception:  # noqa: BLE001 — l'aperçu est un bonus
+                pass
+        if not sent:
+            return
+        buttons = [
+            (f"Utiliser l'image {index + 1}", f"use:{asset.token}")
+            for index, asset in enumerate(assets)
+        ]
+        self._reply(
+            "Images proposées depuis les pages lues. Cliquez pour attacher, "
+            "ou envoyez vos propres photos (ou /image <url>).",
+            keyboard(buttons),
+        )
+
+    def _use_proposed(self, token: str) -> None:
+        asset = self.buffer.get(token)
+        if asset is None:
+            self._reply(
+                "Image proposée introuvable (expirée ou bot redémarré). "
+                "Renvoyez la photo ou /image <url>."
+            )
+            return
+        self._attach_asset(asset)
+        self._preview()
+
+    def _image_add_mode(self, draft_id: str) -> None:
+        store.set_setting(self.conn, "image_mode", draft_id)
+        self._reply(
+            f"Mode ajout d'image activé (maximum {self.MAX_IMAGES_PER_DRAFT} images par post). "
+            "Envoyez 1, 2 ou plus de photos depuis le téléphone (une par message ou en album), "
+            "ou /image <url> : chaque photo devient une image du brouillon. "
+            "Puis /preview pour voir le rendu et valider les images exactes."
+        )
 
     def _photo(self, photo: list) -> None:
         """Photo envoyée depuis le téléphone : octets en RAM, jamais sur disque."""
@@ -406,20 +527,32 @@ class Conversation:
         self._attach_asset(asset)
 
     def _attach_asset(self, asset) -> None:
-        """Attache l'image au brouillon actif en créant une révision."""
+        """Attache l'image au brouillon actif en créant une révision.
+
+        Plusieurs images sont permises (jusqu'à 4 = limite LinkedIn par post) :
+        chacune est une entrée du manifeste, approuvée sur son empreinte exacte.
+        """
         draft_id = self._active_draft()
         if not draft_id:
             draft_id = self._create_draft("")
-        text = self._current_text(draft_id)
-        manifest = self._manifest(text, image=asset.manifest_entry())
+        current = self._current_images(draft_id)
+        if len(current) >= self.MAX_IMAGES_PER_DRAFT:
+            self._reply(
+                f"Limite de {self.MAX_IMAGES_PER_DRAFT} images par post atteinte. "
+                "Retirez une image ou /preview pour valider celles-ci."
+            )
+            return
+        images = [*current, asset.manifest_entry()]
+        manifest = self._manifest(self._current_text(draft_id), images=images)
         try:
-            revision = store.add_revision(self.conn, draft_id, text, manifest)
+            revision = store.add_revision(self.conn, draft_id, self._current_text(draft_id), manifest)
         except store.StoreError as exc:
             self._reply(f"Image non attachée ({exc.code}) : {exc}")
             return
         self._reply(
-            f"Image attachée ({asset.content_type}, {asset.size} octets, empreinte {asset.sha256[:12]}). "
-            f"Révision {revision}. /preview pour voir le rendu et valider l'image exacte."
+            f"Image attachée ({len(images)}/{self.MAX_IMAGES_PER_DRAFT} — {asset.content_type}, "
+            f"{asset.size} octets, empreinte {asset.sha256[:12]}). "
+            f"Révision {revision}. /preview pour voir le rendu et valider les images exactes."
         )
 
     def _current_text(self, draft_id: str) -> str:
@@ -430,34 +563,84 @@ class Conversation:
         ).fetchone()
         return row["text"] if row else ""
 
-    def _current_image(self, draft_id: str) -> dict | None:
+    def _current_images(self, draft_id: str) -> list[dict]:
+        """Entrées d'images de la révision courante (« images » ; héritage « image »)."""
         row = self.conn.execute(
             "SELECT v.manifest_json FROM draft_versions v JOIN drafts d ON d.id = v.draft_id "
             "AND d.current_revision = v.revision WHERE d.id = ?",
             (draft_id,),
         ).fetchone()
         if row is None:
-            return None
+            return []
         try:
             manifest = json.loads(row["manifest_json"])
         except json.JSONDecodeError:
-            return None
-        return manifest.get("image")
+            return []
+        images = manifest.get("images")
+        if isinstance(images, list):
+            return [entry for entry in images if isinstance(entry, dict)]
+        legacy = manifest.get("image")
+        return [legacy] if isinstance(legacy, dict) else []
 
     # ---------------------------------------------------------------- brouillon
 
     def _save_text(self, text: str) -> None:
         draft_id = self._active_draft()
+        note = ""
+        if draft_id and self._current_text(draft_id).strip():
+            # Un brouillon existe déjà : le message est une consigne, une
+            # critique, ou le texte final complet. Interprétation par le LLM.
+            revision = self._llm_revise(draft_id, text)
+            if revision is not None:
+                text, note = revision
         if not draft_id:
             draft_id = store.create_draft(self.conn)
             store.set_setting(self.conn, "active_draft", draft_id)
-        manifest = self._manifest(text, image=self._current_image(draft_id))
+        manifest = self._manifest(text, images=self._current_images(draft_id))
         try:
             revision = store.add_revision(self.conn, draft_id, text, manifest)
         except store.StoreError as exc:
             self._reply(f"Enregistrement refusé ({exc.code}) : {exc}")
             return
-        self._reply(f"Révision {revision} enregistrée. /preview pour vérifier et valider le texte exact.")
+        if len(text) > 3000:
+            self._reply(
+                f"ATTENTION : {len(text)} caractères — LinkedIn refuse un commentary "
+                "au-delà de 3 000. Raccourcissez avant publication."
+            )
+        self._reply(
+            f"Révision {revision} enregistrée{note}. "
+            "/preview pour vérifier et valider le texte exact."
+        )
+
+    def _llm_revise(self, draft_id: str, message: str) -> tuple[str, str] | None:
+        """Interprète le message libre PAR LE LLM (consigne, texte, ou les deux).
+
+        - adaptateur simulé → None : le texte brut est enregistré sans
+          « interprétation » simulée ;
+        - erreur LLM → (texte brut, note) : enregistré tel quel, jamais bloquant ;
+        - sortie vide ou identique au brouillon → None.
+        La sortie reste une PROPOSITION de brouillon : elle ne valide rien et
+        ne publie rien ; les validations TEXT/IMAGE/FINAL restent requises.
+        """
+        provider = self._llm()
+        if not getattr(provider, "is_real", False):
+            return None
+        settings = self._research_settings()
+        prompt = research_mod.build_revision_prompt(
+            self._current_text(draft_id),
+            message,
+            tone=settings["tone"],
+            language=settings["language"],
+        )
+        try:
+            result = provider.generate("draft_revision", prompt)
+        except Exception as exc:  # noqa: BLE001 — le texte brut reste enregistré
+            code = getattr(exc, "code", type(exc).__name__)
+            return message, f" (interprétation LLM impossible ({code}) — texte enregistré tel quel)"
+        new_text = (result.text or "").strip()
+        if not new_text or new_text == self._current_text(draft_id).strip():
+            return None
+        return new_text, f" (reformulée par {result.provider}/{result.model})"
 
     def _preview(self) -> None:
         draft_id = self._active_draft()
@@ -468,31 +651,43 @@ class Conversation:
         if draft is None or draft["current_revision"] == 0:
             self._reply("Brouillon vide. Envoyez le texte du post.")
             return
+        store.set_setting(self.conn, "image_mode", "")
         version = self.conn.execute(
             "SELECT text FROM draft_versions WHERE draft_id = ? AND revision = ?",
             (draft_id, draft["current_revision"]),
         ).fetchone()
         self._reply(f"Aperçu — révision {draft['current_revision']} (texte exact) :\n\n{version['text']}")
-        image = self._current_image(draft_id)
-        if image:
-            asset = self.buffer.get(image.get("token"))
+        images = self._current_images(draft_id)
+        missing = False
+        for index, entry in enumerate(images, start=1):
+            asset = self.buffer.get(entry.get("token"))
             if asset is None:
-                self._reply(
-                    "ATTENTION : l'image n'est plus en mémoire (redémarrage du bot). "
-                    "Renvoyez la photo, puis /preview à nouveau."
-                )
-                return
+                missing = True
+                continue
             try:
                 self.client.send_photo(
                     self.config.chat_id,
                     asset.data,
-                    caption=f"Image jointe (révision {draft['current_revision']}, {asset.content_type})",
+                    caption=f"Image jointe {index}/{len(images)} "
+                    f"(révision {draft['current_revision']}, {asset.content_type})",
+                    content_type=asset.content_type,
                 )
             except Exception:  # noqa: BLE001 — l'aperçu photo est un bonus
                 pass
+        if missing:
+            self._reply(
+                "ATTENTION : au moins une image n'est plus en mémoire (redémarrage du bot). "
+                "Renvoyez les photos, puis /preview à nouveau."
+            )
+            return
         self._reply(
             "Validez ce texte exact, puis l'image (ou son absence), puis l'autorisation finale.",
-            keyboard([("Approuver le texte", f"text:{draft_id}")]),
+            keyboard(
+                [
+                    ("Approuver le texte", f"text:{draft_id}"),
+                    ("🖼 Ajouter une image", f"imgadd:{draft_id}"),
+                ]
+            ),
         )
 
     # -------------------------------------------------------------- validations
@@ -510,6 +705,10 @@ class Conversation:
                 self._approve_no_image(data[6:], actor)
             elif data.startswith("pub:"):
                 self._final_publish(data[4:], actor)
+            elif data.startswith("imgadd:"):
+                self._image_add_mode(data[7:])
+            elif data.startswith("use:"):
+                self._use_proposed(data[4:])
             else:
                 self._reply("Bouton inconnu ou expiré. Refaites /preview.")
         except store.StoreError as exc:
@@ -525,42 +724,55 @@ class Conversation:
         revision = self._draft_revision(draft_id)
         if store.find_valid_approval(self.conn, draft_id, revision, "TEXT") is None:
             store.record_approval(self.conn, draft_id, revision, "TEXT", actor, expires_at=self._expiry())
-        image = self._current_image(draft_id)
-        if image:
-            asset = self.buffer.get(image.get("token"))
-            if asset is None:
+        images = self._current_images(draft_id)
+        if images:
+            missing = [entry for entry in images if self.buffer.get(entry.get("token")) is None]
+            if missing:
                 self._reply(
                     "Image perdue (redémarrage) : impossible d'approuver. "
-                    "Renvoyez la photo, puis /preview à nouveau."
+                    "Renvoyez les photos, puis /preview à nouveau."
                 )
                 return
             self._reply(
-                f"Texte approuvé (révision {revision}). Approuvez maintenant l'image exacte "
-                f"({asset.content_type}, {asset.size} octets).",
-                keyboard([("Approuver l'image", f"image:{draft_id}")]),
+                f"Texte approuvé (révision {revision}). Approuvez maintenant les {len(images)} image(s) exacte(s).",
+                keyboard(
+                    [
+                        ("Approuver les images", f"image:{draft_id}"),
+                        ("🖼 Ajouter une image", f"imgadd:{draft_id}"),
+                    ]
+                ),
             )
             return
         self._reply(
-            f"Texte approuvé (révision {revision}). Validez maintenant l'absence d'image.",
-            keyboard([("Sans image", f"noimg:{draft_id}")]),
+            f"Texte approuvé (révision {revision}). Ajoutez une image si vous voulez, "
+            "ou validez l'absence d'image.",
+            keyboard(
+                [
+                    ("🖼 Ajouter une image", f"imgadd:{draft_id}"),
+                    ("Sans image", f"noimg:{draft_id}"),
+                ]
+            ),
         )
 
     def _approve_image(self, draft_id: str, actor: str) -> None:
         revision = self._draft_revision(draft_id)
-        image = self._current_image(draft_id)
-        if not image:
+        images = self._current_images(draft_id)
+        if not images:
             raise store.StoreError("NO_IMAGE", "aucune image à approuver sur cette révision")
-        asset = self.buffer.get(image.get("token"))
-        if asset is None:
-            raise store.StoreError(
-                "IMAGE_BUFFER_LOST", "image perdue au redémarrage ; renvoyez la photo et refaites /preview"
-            )
-        if image.get("sha256") and image["sha256"] != asset.sha256:
-            raise store.StoreError("IMAGE_MISMATCH", "les octets ne correspondent pas à l'image approuvée")
+        hashes = []
+        for entry in images:
+            asset = self.buffer.get(entry.get("token"))
+            if asset is None:
+                raise store.StoreError(
+                    "IMAGE_BUFFER_LOST", "image perdue au redémarrage ; renvoyez la photo et refaites /preview"
+                )
+            if entry.get("sha256") and entry["sha256"] != asset.sha256:
+                raise store.StoreError("IMAGE_MISMATCH", "les octets ne correspondent pas à l'image approuvée")
+            hashes.append(asset.sha256)
         if store.find_valid_approval(self.conn, draft_id, revision, "IMAGE") is None:
             store.record_approval(self.conn, draft_id, revision, "IMAGE", actor, expires_at=self._expiry())
         self._reply(
-            f"Image approuvée (empreinte {asset.sha256[:12]}). "
+            f"{len(images)} image(s) approuvée(s) (empreintes {', '.join(h[:12] for h in hashes)}). "
             "Autorisation finale ci-dessous : elle vaut pour CETTE révision exacte.",
             keyboard([(self._publish_label(), self._final_button(draft_id, revision))]),
         )

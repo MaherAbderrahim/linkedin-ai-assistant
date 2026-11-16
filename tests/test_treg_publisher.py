@@ -513,6 +513,62 @@ def test_planned_image_is_uploaded_then_published(monkeypatch):
     assert runner.payloads[1]["content"] == {"media": {"id": "urn:li:image:abc123"}}
 
 
+def test_planned_multi_images_uploaded_in_order(monkeypatch):
+    """Parcours complet : 2 images approuvées → 2 initializeUpload → 2 PUT → multiImage."""
+    from linkedin_assistant import media
+
+    buffer = media.ImageBuffer()
+    asset_a = buffer.add(b"\x89PNG\r\n\x1a\nAAA", content_type="image/png", filename="a.png", source="url")
+    asset_b = buffer.add(b"\xff\xd8\xffJPEGBBB", content_type="image/jpeg", filename="b.jpg", source="url")
+    runner = FakeRunner(
+        [
+            (0, CONNECTIONS_OK, ""),  # résolution (première image)
+            (0, INIT_OK, ""),
+            (0, CONNECTIONS_OK, ""),  # résolution (deuxième image)
+            (0, INIT_OK, ""),
+            (0, CONNECTIONS_OK, ""),  # résolution (post)
+            (0, '{"result":"", "_treg":{"http_status":201,"call_id":"post-1"}}', ""),
+        ]
+    )
+    uploader = FakeUploader()
+    monkeypatch.setattr(TregPublisher, "_put_binary", staticmethod(uploader))
+    adapter = TregPublisher(api_version="202501", runner=runner, buffer=buffer)
+
+    manifest = make_manifest()
+    manifest["images"] = [asset_a.manifest_entry(), asset_b.manifest_entry()]
+    receipt = adapter.post(manifest)
+
+    assert receipt["http_status"] == 201
+    assert len(uploader.calls) == 2
+    assert uploader.calls[1][2] == "image/jpeg"
+    content = runner.payloads[2]["content"]
+    assert content["multiImage"]["images"] == [
+        {"id": "urn:li:image:abc123"},
+        {"id": "urn:li:image:abc123"},
+    ]
+
+
+def test_planned_multi_images_fail_closed_on_lost_asset(monkeypatch):
+    """Deuxième image perdue (redémarrage) : refus, aucune publication, aucun post."""
+    from linkedin_assistant import media
+
+    buffer = media.ImageBuffer()
+    asset_a = buffer.add(b"\x89PNG\r\n\x1a\nAAA", content_type="image/png", filename="a.png", source="url")
+    asset_b = buffer.add(b"\xff\xd8\xffJPEGBBB", content_type="image/jpeg", filename="b.jpg", source="url")
+    entries = [asset_a.manifest_entry(), asset_b.manifest_entry()]
+    buffer.clear()
+    runner = FakeRunner([])
+    uploader = FakeUploader()
+    monkeypatch.setattr(TregPublisher, "_put_binary", staticmethod(uploader))
+    adapter = TregPublisher(api_version="202501", runner=runner, buffer=buffer)
+    manifest = make_manifest()
+    manifest["images"] = entries
+    with pytest.raises(PublisherError) as exc:
+        adapter.post(manifest)
+    assert "IMAGE_BUFFER_LOST" in str(exc.value)
+    assert uploader.calls == []
+
+
 def test_planned_image_refused_when_buffer_lost(monkeypatch):
     """Tampon perdu (redémarrage) : refus SANS aucun appel externe."""
     from linkedin_assistant import media

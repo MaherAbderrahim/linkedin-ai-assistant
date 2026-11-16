@@ -105,10 +105,11 @@ class TelegramClient:
             payload["reply_markup"] = reply_markup
         return self._transport.request("sendMessage", payload)
 
-    def send_photo(self, chat_id: int, photo: bytes, caption: str | None = None) -> dict:
+    def send_photo(self, chat_id: int, photo: bytes, caption: str | None = None,
+                   content_type: str = "image/png") -> dict:
         """Envoie une image (aperçu de la publication). RAM seule côté assistant."""
         fields = {"chat_id": chat_id, "caption": caption}
-        files = {"photo": ("image.png", photo, "image/png")}
+        files = {"photo": ("image.png", photo, content_type)}
         sender = getattr(self._transport, "request_multipart", None)
         if sender is None:
             raise TelegramError("transport incapable d'envoyer une image")
