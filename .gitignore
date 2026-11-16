@@ -4,6 +4,7 @@
 !.env.example
 config.toml
 *.local.toml
+*.bak
 secrets/
 
 # Base métier et données locales (ne jamais publier l'archive ni les journaux)

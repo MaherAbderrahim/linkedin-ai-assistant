@@ -1,4 +1,4 @@
-# Runbook de qualification treg — `/rest/posts` et parcours image
+﻿# Runbook de qualification treg — `/rest/posts` et parcours image
 
 Date : 14 novembre 2026. **Statut : préparation uniquement — RIEN dans ce document n'a été exécuté.** Chaque étape réelle exige une autorisation distincte de l'utilisateur, sur l'action ET le contenu exact. Contexte : [ADR-16](ARCHITECTURE_DECISIONS.md), [API_INTEGRATIONS.md §2](API_INTEGRATIONS.md).
 
@@ -18,7 +18,7 @@ Date : 14 novembre 2026. **Statut : préparation uniquement — RIEN dans ce doc
 ## État préalable (attesté, ne pas refaire sans nécessité)
 
 - Connexion treg `linkedin` health=ok, capability `write`, consentement navigateur utilisateur.
-- Identité vérifiée : `treg call linkedin v2/userinfo` → 200 (sub membre, `w_member_social`, expiration 2027-01-13).
+- Identité vérifiée : `treg call linkedin v2/userinfo` → 200 (sub membre, `w_member_social`, expiration ~2 ans, datée à chaque connexion).
 - Catalogue attesté (lecture, 0 $) : `linkedin.linkedin.user.post.create` → `POST https://api.linkedin.com/rest/posts`.
 - Crédit d'essai treg : 1,00 $ initial, reste 0,9921 $ au 14 nov — **la publication est 0 $, ne pas appeler les endpoints mesurés** (`treg.linkedin.user.posts`, `treg.linkedin.post.detail`, `treg.google.serp.organic`).
 
@@ -35,7 +35,7 @@ Prérequis d'autorisation : contenu du post de test choisi et approuvé par l'ut
 1. Créer `post.json` (fichier local, jamais versionné) :
    ```json
    {
-     "author": "urn:li:person:UkLKzuK9bT",
+     "author": "urn:li:person:VOTRE_URN_MEMBRE",
      "commentary": "Texte exact approuvé par l'utilisateur (échapper ( ) [ ] { } < > @ | ~ avec backslash).",
      "visibility": "PUBLIC",
      "distribution": {"feedDistribution": "MAIN_FEED", "targetEntities": [], "thirdPartyDistributionChannels": []},
