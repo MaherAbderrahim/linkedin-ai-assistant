@@ -32,6 +32,7 @@ SPEC: tuple[Entry, ...] = (
     Entry("search_max_pages", "Pages de recherche max par tour", "int", bounds=(1, 5)),
     Entry("images_enabled", "Images activées", "bool"),
     Entry("image_provider", "Source d'images", "choice", choices=("commons", "user", "none")),
+    Entry("post_visibility", "Visibilité des publications", "choice", choices=("public", "connections")),
     Entry("llm_provider", "Fournisseur LLM (choisi après comparaison)", "choice", choices=("groq", "openrouter", "none")),
     Entry("llm_model", "Modèle LLM (identifiant exact, choisi après comparaison)", "text"),
     Entry("reminders_enabled", "Rappels activés", "bool"),

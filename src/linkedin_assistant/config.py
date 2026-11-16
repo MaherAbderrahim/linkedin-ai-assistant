@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +26,11 @@ class Config:
     env_file: Path | None = None
     missing_env: tuple[str, ...] = ()
     dashboard_port: int = 8000
+    #: "simulated" (aucun appel externe) ou "treg" (publication réelle).
+    publisher: str = "simulated"
+    #: Version LinkedIn-Version (YYYYMM) choisie explicitement, requise par
+    #: l'adaptateur treg : aucun choix silencieux de version.
+    linkedin_api_version: str = ""
 
     @property
     def simulation(self) -> bool:
@@ -48,6 +54,16 @@ def load(path: str | Path) -> Config:
     dashboard_port = data.get("dashboard_port", 8000)
     if not isinstance(dashboard_port, int) or isinstance(dashboard_port, bool) or not (1 <= dashboard_port <= 65535):
         raise ConfigError("dashboard_port doit être un entier entre 1 et 65535")
+
+    publisher = str(data.get("publisher", "simulated")).strip().lower()
+    if publisher not in ("simulated", "treg"):
+        raise ConfigError("publisher doit être 'simulated' ou 'treg'")
+    linkedin_api_version = str(data.get("linkedin_api_version", "") or "").strip()
+    if publisher == "treg" and not re.fullmatch(r"\d{6}", linkedin_api_version):
+        raise ConfigError(
+            "linkedin_api_version (YYYYMM) est obligatoire et doit être choisi explicitement "
+            "quand publisher = 'treg'"
+        )
 
     db_path = Path(data.get("db_path", "data/assistant.db"))
     if not db_path.is_absolute():
@@ -79,4 +95,6 @@ def load(path: str | Path) -> Config:
         env_file=env_path,
         missing_env=tuple(missing_names()),
         dashboard_port=dashboard_port,
+        publisher=publisher,
+        linkedin_api_version=linkedin_api_version,
     )

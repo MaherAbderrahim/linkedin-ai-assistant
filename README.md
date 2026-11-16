@@ -2,7 +2,7 @@
 
 Assistant personnel pour rechercher, rédiger, corriger et publier du contenu LinkedIn depuis Telegram, **uniquement après validations explicites**.
 
-**Statut au 14 novembre 2026 : Phase 1 (volet B) livrée — loader `.env` stdlib + validation par nom au démarrage, rappel 10 h `Africa/Tunis` modifiable, paramètres progressifs partagés Telegram/dashboard (`/settings`), contrat `Publisher` formalisé avec résolution dynamique treg, contrat `LLMProvider` + adaptateurs simulés Groq/OpenRouter + harness de comparaison (`llm_benchmarks`, aucun appel réel), squelette du tableau de bord local `127.0.0.1:8000` (config, état, benchmarks, archive — aucune publication) — 143 tests sans réseau. Phases 2 à 4 et rappels locaux déjà livrées. Scaffolding Phase 5 simulé livré (SearchProvider + budget, extracteur SSRF). Accès de publication LinkedIn provisionné via treg (proxy de credentials, ADR-16) — connexion active, identité et `w_member_social` vérifiés ; publication réelle NON TESTÉE. Chaque action externe exige une autorisation distincte. Dépôt privé : github.com/MaherAbderrahim/linkedin-ai-assistant.**
+**Statut au 16 novembre 2026 : chaîne complète opérationnelle.** `/research <sujet>` (ou `/link <url>`) déclenche une recherche réelle bornée (Tavily) suivie d'une proposition de post rédigée par Groq/OpenRouter ; les images s'attachent depuis le téléphone ou une URL et vivent **en RAM uniquement** ; `/preview` affiche le texte **et** l'image ; les validations sont TEXT → IMAGE/absence → autorisation finale à usage unique ; la publication part par l'API LinkedIn officielle via treg (`POST /rest/posts`), image comprise. **229 tests passent sans réseau.** Publication réelle **qualifiée mais jamais exécutée** : chaque publication exige tes trois validations, dont l'autorisation finale sur la révision exacte.
 
 ## Architecture : décisions validées et propositions
 
@@ -51,6 +51,31 @@ Le **skill Apify a été audité le 13 novembre 2026** (lecture seule de ses fic
 | [QUALIFICATION_TREG.md](docs/QUALIFICATION_TREG.md) | Runbook de qualification réelle treg (`/rest/posts` + image), prêt mais non exécuté ; chaque étape exige une autorisation distincte |
 
 Les documents de spécification sont liés ci-dessus. Code : `src/linkedin_assistant/` (bibliothèque standard uniquement), tests dans `tests/`. Installation locale : `python -m venv .venv` puis `.venv/Scripts/python -m pip install -e ".[dev]"` ; tests : `.venv/Scripts/python -m pytest -q` ; démarrage : `.venv/Scripts/linkedin-assistant --config config.toml` (mode simulation sans jeton, voir `config.example.toml`) ; test interactif sans réseau : ajouter `--local`. Secrets : copier `.env.example` vers `.env` (ignoré par git) et renseigner vos clés en local ; ne jamais les coller dans le chat ni les logger.
+
+### Mode de publication
+
+`config.toml` porte deux clés explicites :
+
+```toml
+publisher = "simulated"        # ou "treg" (publication réelle)
+linkedin_api_version = "202611" # LinkedIn-Version YYYYMM, choisie explicitement
+```
+
+- `publisher = "simulated"` : aucun appel externe, useful pour apprendre le parcours.
+- `publisher = "treg"` : publication réelle via la connexion treg résolue dynamiquement à chaque envoi (`treg connections ls`). Aucun repli silencieux : sans version d'API explicite, le bot refuse de démarrer. La publication reste soumise aux trois validations dans le bot.
+
+### Commandes Telegram
+
+| Commande | Effet |
+|---|---|
+| `/new` puis un texte | brouillon (une révision par message) |
+| `/research <sujet>` | sujet = un simple nom ? le bot demande de préciser l'angle ; sinon recherche bornée → proposition de post |
+| `/link <url>` | lecture de la page puis proposition de post |
+| `/image <url>` ou photo envoyée | image en RAM, attachée au brouillon actif |
+| `/preview` | texte exact + photo + boutons de validation |
+| `/status` `/cancel` `/lastpost <date>` `/reminder on\|off` `/settings <clé> <valeur>` | état, brouillon, déclaration externe, rappels, paramètres |
+
+Les images ne sont **jamais** écrites sur disque ni en base : elles vivent en RAM dans le processus du bot. Un redémarrage les fait disparaître → le bot le signale et exige de renvoyer la photo (nouvel aperçu, nouvelles approbations).
 
 ## Risques et blocages prioritaires
 

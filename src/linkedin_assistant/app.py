@@ -5,10 +5,10 @@ import logging
 import sys
 import time
 
-from . import db, inbox, purge, reminders, store
+from . import db, inbox, media, purge, reminders, store
 from .config import ConfigError, load
 from .conversation import Conversation
-from .publisher import SimulatedPublisher
+from .publisher import build_publisher
 from .telegram import TelegramClient, TelegramError, UrllibTransport, redact
 
 log = logging.getLogger("linkedin_assistant")
@@ -74,10 +74,20 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    client = TelegramClient(UrllibTransport(config.telegram_token, timeout=config.poll_timeout_seconds + 10))
-    conversation = Conversation(conn, config, client, SimulatedPublisher())
+    client = TelegramClient(
+        UrllibTransport(config.telegram_token, timeout=config.poll_timeout_seconds + 10),
+        token=config.telegram_token,
+        timeout=config.poll_timeout_seconds + 30,
+    )
+    buffer = media.ImageBuffer()
+    publisher = build_publisher(config, buffer=buffer)
+    conversation = Conversation(conn, config, client, publisher, buffer=buffer)
 
-    log.info("démarrage long polling, chat=%s, publication LinkedIn simulée", config.chat_id)
+    log.info(
+        "démarrage long polling, chat=%s, publication LinkedIn %s",
+        config.chat_id,
+        "réelle (treg)" if getattr(publisher, "is_real", False) else "simulée",
+    )
     while True:
         try:
             inbox.poll_once(conn, client, config.poll_timeout_seconds)
@@ -88,6 +98,12 @@ def main(argv: list[str] | None = None) -> int:
             time.sleep(5)
         except store.StoreError as exc:
             log.error("erreur de stockage (%s) : %s", exc.code, exc)
+        except Exception as exc:  # noqa: BLE001
+            # Un événement fautif ne doit JAMAIS arrêter l'assistant : l'événement
+            # est marqué FAILED par le traitement d'inbox (aucun retry
+            # automatique), le cycle suivant reprend. Le bot reste disponible.
+            log.exception("erreur inattendue dans la boucle principale : %s", exc)
+            time.sleep(5)
         except KeyboardInterrupt:
             log.info("arrêt demandé")
             return 0

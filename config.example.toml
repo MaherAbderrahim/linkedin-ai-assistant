@@ -2,8 +2,8 @@
 # Le jeton du bot Telegram ne se met JAMAIS ici : variable d'environnement TELEGRAM_BOT_TOKEN.
 
 # Identifiants numériques Telegram (pas des usernames). Chat privé uniquement.
-owner_id = 123456789
-chat_id = 123456789
+owner_id = 8461789789
+chat_id = 8461789789
 
 db_path = "data/assistant.db"
 timezone = "Africa/Tunis"
@@ -11,11 +11,21 @@ approval_ttl_seconds = 3600
 poll_timeout_seconds = 25
 
 # URN du membre LinkedIn, à renseigner après vérification OAuth (phase 6).
-linkedin_account = "urn:li:person:UNCONFIGURED"
+linkedin_account = "urn:li:person:UkLKzuK9bT"
+
+# Mode de publication : "simulated" (aucun envoi externe) ou "treg" (publication
+# réelle via la connexion treg résolue dynamiquement à chaque envoi).
+# Aucun repli silencieux : en "treg", le bot refuse de démarrer si la version
+# d'API ci-dessous est absente ou invalide.
+publisher = "simulated"
+
+# Version LinkedIn-Version (YYYYMM) choisie EXPLICITEMENT, jamais par défaut.
+# Consigner la date du choix à côté. OBLIGATOIRE quand publisher = "treg".
+linkedin_api_version = ""
 
 # Fichier d'environnement local (facultatif ; absent = aucune variable chargée).
 # Valeurs de secours factices dans .env.example ; le vrai .env est créé par vous.
-# env_file = ".env"
+env_file = ".env"
 
 # Tableau de bord local : 127.0.0.1 uniquement, jamais exposé publiquement.
 dashboard_port = 8000

@@ -2,6 +2,19 @@
 
 Date : 14 novembre 2026. **Statut : préparation uniquement — RIEN dans ce document n'a été exécuté.** Chaque étape réelle exige une autorisation distincte de l'utilisateur, sur l'action ET le contenu exact. Contexte : [ADR-16](ARCHITECTURE_DECISIONS.md), [API_INTEGRATIONS.md §2](API_INTEGRATIONS.md).
 
+> **Mise à jour 16 novembre 2026 : la chaîne de publication réelle est câblée**
+> (`publisher = "treg"`, `linkedin_api_version = "202611"` consigné le 16/11/2026).
+> Le parcours automatisé est : `/preview` → validation TEXTE → validation
+> IMAGE/absence → autorisation finale à usage unique → `initializeUpload` (image,
+> RAM seule) → `POST /rest/posts`. **La qualification réelle reste NON
+> EXÉCUTÉE** : le premier clic sur « Publier sur LinkedIn » la déclenchera, et
+> ce clic est l'autorisation de l'utilisateur sur le contenu exact.
+>
+> Point de vigilance relevé le 16/11/2026 : la documentation LinkedIn mentionne
+> la dépréciation de la version `202511` au 16 novembre 2026. Si la version
+> `202611` est refusée (HTTP 4xx), en choisir une autre **explicitement** dans
+> `config.toml` et le consigner ici avec la date — jamais de version implicite.
+
 ## État préalable (attesté, ne pas refaire sans nécessité)
 
 - Connexion treg `linkedin` health=ok, capability `write`, consentement navigateur utilisateur.

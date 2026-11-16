@@ -154,4 +154,52 @@ def test_fingerprint_excludes_internal_ids():
 def test_normalization_is_conservative():
     assert normalize_for_comparison("  Bonjour\r\nle  monde  ") == "Bonjour\nle monde"
     assert normalize_for_comparison("Post 1: https://exemple.fr/a,b!") != normalize_for_comparison("Post 2: https://exemple.fr/a,b!")
-    assert normalize_for_comparison("café") == normalize_for_comparison("café")
+    assert normalize_for_comparison("café") == normalize_for_comparison("café")
+
+
+def test_two_publications_on_one_database_do_not_collide(conn):
+    """Régression (test Telegram réel du 16 novembre 2026) : l'URN simulé était
+    constant, la contrainte UNIQUE(namespace, identifier) heurtait dès la
+    deuxième publication de la même base et le bot s'arrêtait."""
+    _, _, final1 = approved_draft(conn, "Premier post.")
+    intent1 = store.consume_final_and_create_intent(conn, final1, "owner")
+    assert publish(conn, intent1, SimulatedPublisher()) == "PUBLISHED"
+    _, _, final2 = approved_draft(conn, "Deuxième post.")
+    intent2 = store.consume_final_and_create_intent(conn, final2, "owner")
+    assert publish(conn, intent2, SimulatedPublisher()) == "PUBLISHED"
+    identifiers = conn.execute("SELECT identifier FROM history_identifiers ORDER BY identifier").fetchall()
+    assert len(identifiers) == 2
+    assert identifiers[0]["identifier"] != identifiers[1]["identifier"]
+
+
+def test_archive_failure_after_simulated_send_is_traduced(conn, monkeypatch):
+    """Un échec d'archivage local ne doit pas propager l'exception (le bot
+    tombait) ni laisser l'intention coincée dans un état verrouillant."""
+    def boom(*args, **kwargs):
+        raise RuntimeError("stockage indisponible")
+
+    _, _, final = approved_draft(conn, "Texte.")
+    intent = store.consume_final_and_create_intent(conn, final, "owner")
+    monkeypatch.setattr(store, "record_success", boom)
+    assert publish(conn, intent, SimulatedPublisher()) == "FAILED"
+    row = conn.execute("SELECT * FROM publication_intents WHERE id = ?", (intent,)).fetchone()
+    assert row["state"] == "FAILED"
+    assert row["error"]
+
+
+def test_archive_failure_after_real_send_locks_account(conn, monkeypatch):
+    """Adaptateur réel : l'envoi a pu aboutir, le résultat reste incertain."""
+    class RealAdapter(SimulatedPublisher):
+        is_real = True
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("stockage indisponible")
+
+    _, _, final = approved_draft(conn, "Texte.")
+    intent = store.consume_final_and_create_intent(conn, final, "owner")
+    monkeypatch.setattr(store, "record_success", boom)
+    assert publish(conn, intent, RealAdapter()) == "UNKNOWN_OUTCOME"
+    row = conn.execute("SELECT * FROM publication_intents WHERE id = ?", (intent,)).fetchone()
+    assert row["state"] == "UNKNOWN_OUTCOME"
+    draft = conn.execute("SELECT * FROM drafts WHERE id = ?", (row["draft_id"],)).fetchone()
+    assert draft["state"] == "BLOCKED"

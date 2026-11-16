@@ -21,11 +21,24 @@ def test_simulated_provider_deterministic():
     assert all(h.url.startswith("https://") for h in hits1)
 
 
-def test_provider_factory_refuses_unqualified():
+def test_provider_factory_refuses_unqualified(monkeypatch):
+    """Sans clé, la recherche réelle est refusée explicitement (pas de mode
+    dégradé silencieux) ; `none` reste le mode simulé."""
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     with pytest.raises(searching.SearchError) as exc:
         searching.provider("tavily")
-    assert exc.value.code == "PROVIDER_NOT_QUALIFIED"
+    assert exc.value.code == "SEARCH_KEY_MISSING"
     assert isinstance(searching.provider("none"), searching.SimulatedSearchProvider)
+    with pytest.raises(searching.SearchError) as exc:
+        searching.provider("google")
+    assert exc.value.code == "PROVIDER_UNKNOWN"
+
+
+def test_provider_factory_builds_tavily_with_key(monkeypatch):
+    monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
+    p = searching.provider("tavily")
+    assert isinstance(p, searching.TavilySearchProvider)
+    assert p.is_real is True
 
 
 def test_provider_rejects_bad_input():
@@ -112,3 +125,14 @@ def test_fetch_refuses_unresolvable_without_leaking():
     with pytest.raises(extracting.ExtractError) as exc:
         extracting.fetch("https://test.invalid/page", timeout=2)
     assert exc.value.code in ("DNS_FAIL", "FETCH_FAIL")
+
+
+def test_nat64_addresses_are_not_treated_as_reserved():
+    """Les préfixes NAT64 (64:ff9b::/96) sont globaux : un faux positif ici
+    bloquerait des sites publics légitimes (observé le 16 novembre 2026)."""
+    import ipaddress
+
+    nat64 = ipaddress.ip_address("64:ff9b::d896:1041")
+    assert nat64.is_global is True
+    assert extracting._is_private_ip(nat64) is False
+    assert extracting.is_public_http_url("https://example.fr/page") is True
