@@ -1,3 +1,8 @@
+import os
+from pathlib import Path
+import runpy
+import sys
+
 import pytest
 
 from linkedin_assistant import app, config as config_mod, inbox, purge, store
@@ -265,3 +270,23 @@ def test_app_simulation_exits_without_network(tmp_path, monkeypatch, capsys):
     assert app.main(["--config", str(path)]) == 0
     assert "simulation" in capsys.readouterr().out.lower()
     assert (tmp_path / "data" / "assistant.db").exists()
+
+
+@pytest.mark.parametrize("user_bin_exists", [False, True])
+def test_managed_launcher_preserves_path_and_adds_user_bin(tmp_path, monkeypatch, user_bin_exists):
+    launcher = tmp_path / "main.py"
+    launcher.write_text((Path(__file__).parents[1] / "app.py").read_text(encoding="utf-8"), encoding="utf-8")
+    user_bin = tmp_path / ".local" / "bin"
+    if user_bin_exists:
+        user_bin.mkdir(parents=True)
+    original_path = "existing-bin"
+    monkeypatch.setenv("PATH", original_path)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(app, "main", lambda: 0)
+
+    with pytest.raises(SystemExit) as stopped:
+        runpy.run_path(str(launcher), run_name="__main__")
+
+    assert stopped.value.code == 0
+    expected = str(user_bin) + os.pathsep + original_path if user_bin_exists else original_path
+    assert os.environ["PATH"] == expected

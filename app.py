@@ -17,6 +17,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
+local_bin = ROOT / ".local" / "bin"
+if local_bin.is_dir():
+    os.environ["PATH"] = str(local_bin) + os.pathsep + os.environ.get("PATH", "")
 
 os.makedirs(ROOT / "data", exist_ok=True)
 

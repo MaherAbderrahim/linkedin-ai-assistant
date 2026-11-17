@@ -19,6 +19,7 @@ from linkedin_assistant.publisher import (
     CertainPublicationError,
     PublisherError,
     TregPublisher,
+    escape_little_text,
     feed_preview,
     publish,
 )
@@ -206,8 +207,7 @@ def test_success_returns_receipt_and_exact_payload():
 
     payload = runner.payloads[0]
     assert payload["author"] == ACCOUNT
-    # Texte exact approuvé : aucun échappement ni retouche ajoutés.
-    assert payload["commentary"] == TEXT_EXACT
+    assert payload["commentary"] == escape_little_text(TEXT_EXACT)
     assert payload["visibility"] == "PUBLIC"
     assert payload["distribution"] == {
         "feedDistribution": "MAIN_FEED",
@@ -226,6 +226,38 @@ def test_success_returns_receipt_and_exact_payload():
     for env in runner.envs:
         assert env["NO_PROXY"] == ""
         assert env["TREG_TELEMETRY"] == "0"
+
+
+@pytest.mark.parametrize(
+    ("text", "encoded"),
+    [
+        (
+            "Le Model Context Protocol (MCP) est un standard open-source. La suite reste visible.",
+            r"Le Model Context Protocol \(MCP\) est un standard open-source. La suite reste visible.",
+        ),
+        ("|{}@[]()<>#\\*_~", r"\|\{\}\@\[\]\(\)\<\>\#\\\*\_\~"),
+        (r"Déjà \(MCP\), chemin C:\outils\fichier", r"Déjà \\\(MCP\\\), chemin C:\\outils\\fichier"),
+        ("@[Nom](urn:li:person:test) {hashtag|#|MCP}", r"\@\[Nom\]\(urn:li:person:test\) \{hashtag\|\#\|MCP\}"),
+        ('Été\n\nMCP : JSON-RPC 2.0, "outils", https://example.invalid/a?x=1&y=2',
+         'Été\n\nMCP : JSON-RPC 2.0, "outils", https://example.invalid/a?x=1&y=2'),
+    ],
+)
+@pytest.mark.parametrize("with_image", [False, True])
+def test_post_encodes_little_text_without_mutating_manifest(text, encoded, with_image):
+    runner = FakeRunner([(0, CONNECTIONS_OK, ""), (0, "HTTP 201\n", "")])
+    manifest = make_manifest(text=text)
+    if with_image:
+        manifest["media"] = {"id": "urn:li:image:aaa", "altText": "Schéma (MCP)"}
+    original = json.dumps(manifest)
+
+    make_adapter(runner).post(manifest)
+
+    assert runner.payloads[0]["commentary"] == encoded
+    assert json.dumps(manifest) == original
+    if with_image:
+        assert runner.payloads[0]["content"] == {"media": manifest["media"]}
+    else:
+        assert "content" not in runner.payloads[0]
 
 
 def test_connections_visibility():
@@ -326,7 +358,8 @@ def test_timeout_is_unknown_outcome():
 
 
 def test_publish_flow_records_success_and_urn(conn):
-    draft_id, revision, final = approved_draft(conn)
+    text = r"Le Model Context Protocol (MCP) : [outils] et C:\MCP."
+    draft_id, revision, final = approved_draft(conn, text)
     intent_id = store.consume_final_and_create_intent(conn, final, "owner")
     runner = FakeRunner(
         [
@@ -346,6 +379,15 @@ def test_publish_flow_records_success_and_urn(conn):
     assert "flow-ok" in receipt["receipt_json"]
     draft = conn.execute("SELECT state FROM drafts WHERE id = ?", (draft_id,)).fetchone()
     assert draft["state"] == "PUBLISHED"
+    assert runner.payloads[0]["commentary"] == r"Le Model Context Protocol \(MCP\) : \[outils\] et C:\\MCP."
+    version = conn.execute(
+        "SELECT text, manifest_json FROM draft_versions WHERE draft_id = ? AND revision = ?",
+        (draft_id, revision),
+    ).fetchone()
+    assert version["text"] == text
+    assert json.loads(version["manifest_json"])["text"] == text
+    archived = conn.execute("SELECT text FROM history_versions").fetchone()
+    assert archived["text"] == text
 
 
 def test_publisher_error_records_failure_without_network_call(conn):

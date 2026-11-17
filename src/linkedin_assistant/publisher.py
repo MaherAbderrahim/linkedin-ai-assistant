@@ -140,6 +140,10 @@ def feed_preview(text: str, limit: int = FEED_PREVIEW_LIMIT) -> dict:
     }
 
 
+def escape_little_text(text: str) -> str:
+    return "".join("\\" + char if char in r"\|{}@[]()<>#*_~" else char for char in text)
+
+
 class TregPublisher(Publisher):
     """Adaptateur réel de publication LinkedIn via la connexion treg (ADR-16).
 
@@ -149,7 +153,7 @@ class TregPublisher(Publisher):
     - Payload conforme au runbook de qualification (docs/QUALIFICATION_TREG.md) :
       POST /rest/posts, en-têtes LinkedIn-Version et X-Restli-Protocol-Version.
     - `api_version` (YYYYMM) est requis explicitement : aucun choix silencieux.
-    - Texte envoyé exactement tel qu'approuvé : aucun échappement ni retouche.
+    - Texte approuvé préservé ; échappement Little Text uniquement au transport.
     - Garde-fous fail-closed : `UNCONFIGURED`, texte absent, image, visibilité
       inconnue ou version invalide = `PublisherError`, sans aucun appel.
     - Erreurs : 4xx = `CertainPublicationError` (rejet documenté, sans effet
@@ -279,7 +283,7 @@ class TregPublisher(Publisher):
             )
         payload = {
             "author": account,
-            "commentary": text,
+            "commentary": escape_little_text(text),
             "visibility": visibility,
             "distribution": {
                 "feedDistribution": "MAIN_FEED",
