@@ -1,0 +1,2 @@
+# Aucune dépendance d'exécution sous Linux (stdlib + SQLite intégrés).
+# tzdata n'est requis que sous Windows (déclaré dans pyproject.toml).
