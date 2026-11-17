@@ -181,6 +181,32 @@ Documentation technique consultée au 13 novembre 2026 :
 
 **Verdict :** à étudier plus tard, pas activé maintenant ; le PC de l’utilisateur sert au développement et aux premiers tests. Alternative conditionnelle, pas préalable bloquant si une machine de confiance existe. [HOST-1 à 4]
 
+### Balayage des clouds gratuits sans carte (17 novembre 2026)
+
+Recherche ciblée puis élimination critère par critère (grille E1–E7 du projet).
+Verdict global : **aucun cloud gratuit sans carte ne satisfait les quatre
+besoins du bot en 2026** (processus 24/7, disque SQLite persistant,
+sous-processus, secrets protégés).
+
+| Candidat | Sans carte | Verdict | Preuve |
+|---|---|---|---|
+| **Northflank** Sandbox | Non | **Éliminé (E2) par essai réel de l'utilisateur le 17 nov 2026** : une carte/moyen de paiement est exigé pour créer la moindre ressource, quel que soit le plan. Docs officielles : *« all users must add a payment method to start creating resources on Northflank, regardless of plan selection »* — la page pricing (« No card needed ») décrivait le plan, pas l'inscription | Essai utilisateur + [docs billing Northflank](https://northflank.com/docs/v1/application/billing/pricing-on-northflank) |
+| **Modal** Starter (30 $/mois de crédits) | Non | Éliminé (E2 + E3) : moyen de paiement obligatoire « to use Modal at all » ; consommation au-delà des crédits **débitée automatiquement, sans plafond dur** | [modal.com/docs/guide/billing](https://modal.com/docs/guide/billing) ; recoupé par freetier.wiki (02 nov 2026) |
+| **Leapcell** Hobby | Oui | Incompatible (E4/E5) : serverless **sans système de fichiers persistant** au plan gratuit (SQLite perdu au scale-down) ; le long polling Telegram ne correspond pas à son modèle requête/réponse ; les « Persistent Servers » 24/7 sont payants (Plus). Une adaptation exigerait de migrer la couche données vers PostgreSQL — contraire à l'architecture validée (SQLite central) | Évaluation FastOpp (sept 2025) ; [leapcell.io/pricing](https://leapcell.io/pricing) |
+| Render, SnapDeploy, Back4App | Oui | Éliminés (E4/E5) : sommeil après 15 min / 60 min, disque éphémère ; le Postgres gratuit de Render expire à 30 jours | Comparatif daté 26 sept 2026 (snapdeploy.dev), recoupé avec render.com/docs/free |
+| Railway Free (1 $/mois) | Oui | Éliminé (E1 en pratique) : pas de sommeil, mais un service 24/7 (~0,5 Go RAM permanent) dépasse largement le crédit mensuel de 1 $ | Comparatif daté 26 sept 2026 |
+| Koyeb | Non | Éliminé (E2) : carte exigée depuis février 2026 (préautorisation 29 $) | koyeb.com/docs/faqs/pricing |
+| Oracle Always Free | Non | Éliminé pour cet utilisateur (pas de carte) — voir section ci-dessus | [HOST-1 à 4] |
+| Hugging Face Spaces | Oui (avant juillet 2026) | Éliminé : Docker/Gradio Spaces **payants depuis juillet 2026** ; disque éphémère | Comparatif daté 26 sept 2026 |
+
+**Conséquence :** la famille d'hébergement qui coche toutes les cases reste le
+**matériel dorm de l'utilisateur** (PC, vieux smartphone via Termux, Raspberry
+Pi, NAS) et le **PC d'un ami en secours** — conformes à la décision du
+13 novembre 2026. Les offres ci-dessus sont re-testables si les conditions
+changent (carte obtenue, nouvelle offre) ; chaque re-test repart de cette
+grille et exige une autorisation distincte.
+
+
 ### PC portable d’un ami
 
 Pas d’abonnement serveur si matériel/connexion existent et sont mis à disposition avec accord. Mais électricité, usure, Internet et temps d’administration ne sont pas nuls ; déterminer qui les assume.
@@ -261,5 +287,8 @@ Les sources ci-dessous ont été consultées le 13 novembre 2026 ; elles ne prou
 - HOST-2 [Oracle — quotas Always Free](https://docs.oracle.com/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) — D, quotas recoupés directement.
 - HOST-3 [Oracle — FAQ](https://www.oracle.com/fr/cloud/free/faq/) — D.
 - HOST-4 [Oracle — confidentialité](https://www.oracle.com/legal/privacy/services-privacy-policy.html) — D.
+- HOST-5 [Northflank — pricing/billing docs](https://northflank.com/docs/v1/application/billing/pricing-on-northflank) — D ; moyen de paiement exigé pour créer des ressources. Recoupé par essai réel de l'utilisateur (17 nov 2026) — R.
+- HOST-6 [Modal — billing guide](https://modal.com/docs/guide/billing) — D ; moyen de paiement obligatoire, dépassement des crédits débité automatiquement. Recoupé par freetier.wiki (02 nov 2026) — D.
+- HOST-7 [Leapcell — pricing](https://leapcell.io/pricing) — D ; serveurs persistants payants, plan gratuit serverless sans disque persistant (évaluation FastOpp, sept 2025) — D.
 
 Les sources LinkedIn sont centralisées dans [API_INTEGRATIONS.md](API_INTEGRATIONS.md) pour garder une référence unique aux permissions, versions et restrictions de données. Les références LI-12/13 ajoutent une contrainte importante : données d’activité des membres lues via Marketing APIs limitées à 48 h et restrictions de transfert ; un accès technique ne suffit donc pas à autoriser leur conservation ou leur envoi à un LLM. Les textes fournis indépendamment par l’utilisateur sont distingués explicitement.
