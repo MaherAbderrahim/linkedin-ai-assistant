@@ -200,7 +200,7 @@ sous-processus, secrets protégés).
 | Hugging Face Spaces | Oui (avant juillet 2026) | Éliminé : Docker/Gradio Spaces **payants depuis juillet 2026** ; disque éphémère | Comparatif daté 26 sept 2026 |
 
 **Conséquence :** la famille d'hébergement qui coche toutes les cases reste le
-**matériel dorm de l'utilisateur** (PC, vieux smartphone via Termux, Raspberry
+**matériel dormant de l'utilisateur** (PC, vieux smartphone via Termux, Raspberry
 Pi, NAS) et le **PC d'un ami en secours** — conformes à la décision du
 13 novembre 2026. Les offres ci-dessus sont re-testables si les conditions
 changent (carte obtenue, nouvelle offre) ; chaque re-test repart de cette
