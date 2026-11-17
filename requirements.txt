@@ -1,2 +1,11 @@
-# Aucune dépendance d'exécution sous Linux (stdlib + SQLite intégrés).
-# tzdata n'est requis que sous Windows (déclaré dans pyproject.toml).
+# Dépendances d'exécution pour un hébergement managé (Linux / conteneur).
+# Le cœur de l'application n'utilise que la bibliothèque standard, mais deux
+# suppléments sont nécessaires sur un hébergeur :
+#
+# - tzdata : `zoneinfo` a besoin de la base de fuseaux horaires ; les images
+#   Linux minimales ne la contiennent pas (Africa/Tunis est chargé au démarrage).
+# - tools-registry : fournit la CLI `treg` (proxy de credentials) utilisée par
+#   l'adaptateur de publication LinkedIn quand publisher = "treg".
+#   Version épinglée sur celle qualifiée localement.
+tzdata>=2024.1
+tools-registry==0.30.0

@@ -14,7 +14,7 @@ Ce guide permet à **n'importe qui** de reproduire l'assistant chez lui, avec **
 |---|---|
 | Python **3.12+** | `python --version` |
 | Git | `git --version` |
-| **treg** (proxy de credentials) | installez la CLI : `pip install treg-cli` (ou voir treg.ai) — c'est lui qui détient l'OAuth LinkedIn, aucun jeton n'est stocké chez vous |
+| **treg** (proxy de credentials) | installez la CLI : `pip install tools-registry` (paquet PyPI qui fournit la commande `treg` ; voir treg.ai) — c'est lui qui détient l'OAuth LinkedIn, aucun jeton n'est stocké chez vous |
 | Un compte LinkedIn personnel | celui qui publiera |
 | Windows/Linux/macOS | les commandes ci-dessous sont PowerShell ; adaptez les chemins `.venv/Scripts` → `.venv/bin` sur Linux/macOS |
 
