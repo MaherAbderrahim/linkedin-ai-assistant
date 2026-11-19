@@ -89,6 +89,10 @@ Avec `TELEGRAM_BOT_TOKEN` présent dans `.env`, le bot démarre en long polling.
 | message libre | consigne interprétée par le LLM sur le brouillon courant, ou texte final si le message est déjà complet |
 | `/image <url>`, photo, bouton « Utiliser » | images candidates proposées en photo par le bot ; jusqu'à 4 images par post |
 | `/preview` | aperçu exact + validations séquentielles |
+| `/folder` | dossier local (config `local_folder`) en lecture seule : `/folder <n>` texte → brouillon, `/folder d<n>` PDF → brouillon (texte extrait), `/folder i<n>` image → candidat photo |
+| `/language` | choisit la langue des posts générés (`fr`, `en`, `ar`) — boutons ou `/language en` |
+| `/humanize` | réécrit le brouillon actif pour un ton plus humain (nouvelle révision, validations requises) |
+| `/drafts` | liste les brouillons sauvegardés (hors publiés) ; bouton « Reprendre » pour en réactiver un puis /preview (images à rattacher : RAM seule) |
 | `/status`, `/cancel`, `/lastpost`, `/reminder`, `/settings` | état, annulation, déclaration de publication externe, rappels, paramètres |
 
 ## 9. Prompt prêt-à-coller pour votre agent de codage

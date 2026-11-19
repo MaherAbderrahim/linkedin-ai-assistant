@@ -108,6 +108,15 @@ def test_prompt_contains_sources_marked_untrusted(fake_page):
     assert "n'invente aucun fait" in prompt
 
 
+def test_prompt_requires_first_person_voice():
+    prompt = research.build_prompt(
+        "ma certification",
+        [research.Source(title="badge.pdf", url="fichier local", excerpt="Amine Touihri — AWS Badge")],
+    )
+    assert "PREMIÈRE personne" in prompt
+    assert "troisième personne" in prompt
+
+
 def test_budget_stops_second_query(fake_page):
     hits = [searching.SearchHit(title="T", url="https://exemple.fr/a", snippet="e")]
     budget = searching.SearchBudget(max_queries=1)

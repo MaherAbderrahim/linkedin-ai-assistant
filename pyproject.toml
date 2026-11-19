@@ -7,7 +7,12 @@ name = "linkedin-ai-assistant"
 version = "0.1.0"
 description = "Assistant personnel LinkedIn piloté par Telegram — archive centrale SQLite, publication officielle après validations explicites"
 requires-python = ">=3.11"
-dependencies = ["tzdata>=2024.1; platform_system == 'Windows'"]
+dependencies = [
+    "tzdata>=2024.1; platform_system == 'Windows'",
+    "pypdf>=5",
+    "pypdfium2>=5",
+    "pillow>=10",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

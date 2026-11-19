@@ -62,6 +62,10 @@ class LLMProvider(abc.ABC):
     @abc.abstractmethod
     def generate(self, task: str, prompt: str) -> LLMResult: ...
 
+    def generate_vision(self, task: str, prompt: str, data: bytes, content_type: str) -> LLMResult:
+        """OCR/image : défaut refusé (l'adaptateur doit le supporter)."""
+        raise LLMError("LLM_VISION_UNSUPPORTED", f"{self.name} : pas de support vision")
+
 
 class SimulatedProvider(LLMProvider):
     """Adaptateur simulé : aucune requête réseau, réponse déterministe marquée."""
@@ -73,6 +77,18 @@ class SimulatedProvider(LLMProvider):
         self.model = model
 
     def generate(self, task: str, prompt: str) -> LLMResult:
+        start = time.perf_counter_ns()
+        text = f"[SIMULATION {self.name}/{self.model}] {prompt[:160]}"
+        latency_ms = (time.perf_counter_ns() - start) // 1_000_000
+        return LLMResult(
+            provider=self.name,
+            model=self.model,
+            text=text,
+            latency_ms=latency_ms,
+            usage={"simulated": True},
+        )
+
+    def generate_vision(self, task: str, prompt: str, data: bytes, content_type: str) -> LLMResult:
         start = time.perf_counter_ns()
         text = f"[SIMULATION {self.name}/{self.model}] {prompt[:160]}"
         latency_ms = (time.perf_counter_ns() - start) // 1_000_000
@@ -126,10 +142,31 @@ class HTTPChatProvider(LLMProvider):
         self._timeout = timeout
 
     def generate(self, task: str, prompt: str) -> LLMResult:
-        messages = []
+        messages = [{"role": "user", "content": prompt}]
+        return self._chat(messages)
+
+    def generate_vision(self, task: str, prompt: str, data: bytes, content_type: str) -> LLMResult:
+        """Image + consigne (OCR vision, modèles multimodaux)."""
+        import base64
+
+        encoded = base64.b64encode(data).decode("ascii")
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{content_type};base64,{encoded}"},
+                    },
+                ],
+            }
+        ]
+        return self._chat(messages)
+
+    def _chat(self, messages: list) -> LLMResult:
         if self._system_prompt:
-            messages.append({"role": "system", "content": self._system_prompt})
-        messages.append({"role": "user", "content": prompt})
+            messages = [{"role": "system", "content": self._system_prompt}, *messages]
         payload = {
             "model": self.model,
             "messages": messages,
@@ -248,6 +285,27 @@ class OpenRouterProvider(HTTPChatProvider):
 
 
 PROVIDER_NAMES = ("groq", "openrouter")
+
+# Modèles multimodaux (OCR vision) : un par fournisseur, offrents gratuites
+# uniquement. Choix explicite dans le code, jamais un modèle payant par défaut.
+VISION_MODELS = {
+    "groq": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "openrouter": "meta-llama/llama-3.2-11b-vision-instruct:free",
+}
+
+
+def vision_provider(name: str) -> LLMProvider:
+    """Adaptateur LLM multimodal pour l'OCR (même fournisseur que le texte)."""
+    if name not in PROVIDER_NAMES:
+        raise LLMError("LLM_PROVIDER_UNKNOWN", f"fournisseur inconnu : {name}")
+    model = VISION_MODELS[name]
+    if name == "groq":
+        if not os.environ.get("GROQ_API_KEY", "").strip():
+            return SimulatedProvider(name, model)
+        return GroqProvider(model)
+    if not os.environ.get("OPENROUTER_API_KEY", "").strip():
+        return SimulatedProvider(name, model)
+    return OpenRouterProvider(model)
 
 
 def provider(name: str, model: str) -> LLMProvider:

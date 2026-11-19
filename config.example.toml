@@ -31,3 +31,8 @@ env_file = ".env"
 
 # Tableau de bord local : 127.0.0.1 uniquement, jamais exposé publiquement.
 dashboard_port = 8000
+
+# Dossier local en LECTURE SEULE (facultatif) : /folder liste les textes (.txt,
+# .md → brouillons) et les images (.jpg/.jpeg/.png/.gif → candidats photo).
+# Accès strictement borné à ce dossier ; rien n'est jamais écrit dedans.
+# local_folder = "D:/Linkedin"
