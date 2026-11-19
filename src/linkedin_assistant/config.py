@@ -31,6 +31,9 @@ class Config:
     #: Version LinkedIn-Version (YYYYMM) choisie explicitement, requise par
     #: l'adaptateur treg : aucun choix silencieux de version.
     linkedin_api_version: str = ""
+    #: Dossier local en LECTURE SEULE (textes → brouillons, images → candidats).
+    #: None = /folder désactivé ; l'existence est vérifiée à l'usage, pas ici.
+    local_folder: Path | None = None
 
     @property
     def simulation(self) -> bool:
@@ -69,6 +72,15 @@ def load(path: str | Path) -> Config:
     if not db_path.is_absolute():
         db_path = path.parent / db_path
 
+    local_folder: Path | None = None
+    raw_folder = data.get("local_folder")
+    if raw_folder is not None:
+        if not isinstance(raw_folder, str) or not raw_folder.strip():
+            raise ConfigError("local_folder doit être un chemin de dossier non vide, ou absent")
+        local_folder = Path(raw_folder.strip())
+        if not local_folder.is_absolute():
+            local_folder = path.parent / local_folder
+
     # Fichier d'environnement local (facultatif, chargé avant la lecture du jeton).
     env_name = data.get("env_file", ".env")
     env_path = Path(env_name)
@@ -97,4 +109,5 @@ def load(path: str | Path) -> Config:
         dashboard_port=dashboard_port,
         publisher=publisher,
         linkedin_api_version=linkedin_api_version,
+        local_folder=local_folder,
     )

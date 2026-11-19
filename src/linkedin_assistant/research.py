@@ -119,6 +119,8 @@ def build_prompt(
         )
     instructions += [
         "Règles :",
+        "- écris à la PREMIÈRE personne (« je », « j'ai obtenu ») : c'est l'auteur qui publie ;",
+        "- ne parle JAMAIS de l'auteur à la troisième personne (pas de « il », « elle », ni de son nom comme d'un tiers) ;",
         "- n'invente aucun fait, aucun chiffre, aucune citation : utilise uniquement les sources ci-dessous ;",
         "- si les sources ne suffisent pas, écris un post prudent sans affirmation non sourcée ;",
         "- pas de titre markdown, pas de hashtag, pas de liste à puces, pas d'emoji ;",

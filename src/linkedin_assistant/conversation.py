@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
-from . import extracting, media, prefs, reminders, research as research_mod, searching, store
+from . import extracting, localfiles, media, prefs, reminders, research as research_mod, searching, store
 from .config import Config
 from .db import transaction
 from .hashing import NORM_VERSION, normalized_hash, sha256_text
@@ -87,6 +87,9 @@ class Conversation:
                 "Assistant LinkedIn personnel. /new crée un brouillon, envoyez ensuite le texte, "
                 "/preview affiche l'aperçu et les validations. /research <sujet> propose un post "
                 "recherché (images candidates proposées en photo), /link <url> part d'un article, "
+                "/folder liste vos fichiers locaux (textes → brouillons, images → candidats photo), "
+                "/language fr|en|ar choisit la langue des posts, /humanize réécrit le brouillon "
+                "pour un ton plus humain, /drafts reprend un brouillon sauvegardé, "
                 "envoyez une photo pour illustrer, un message libre est interprété par le modèle "
                 "quand un brouillon existe, /lastpost déclare une publication externe, "
                 "/reminder on|off gère les rappels, /settings liste et ajuste les paramètres "
@@ -128,10 +131,23 @@ class Conversation:
         if text.startswith("/image"):
             self._image_command(text[len("/image"):].strip())
             return
+        if text.startswith("/folder"):
+            self._folder_command(text[len("/folder"):].strip())
+            return
+        if text.startswith("/language"):
+            self._language_command(text[len("/language"):].strip())
+            return
+        if text == "/humanize":
+            self._humanize_command()
+            return
+        if text == "/drafts":
+            self._drafts_command()
+            return
         if text.startswith("/"):
             self._reply(
                 "Commande inconnue. /start, /new, /preview, /status, /cancel, /lastpost, "
-                "/reminder, /settings, /research, /link, /image."
+                "/reminder, /settings, /research, /link, /image, /folder, /language, "
+                "/humanize, /drafts."
             )
             return
         self._free_text(text)
@@ -380,6 +396,40 @@ class Conversation:
         store.add_revision(self.conn, draft_id, text, self._manifest(text))
         return draft_id
 
+    def _write_post(self, topic: str, source: research_mod.Source) -> str | None:
+        """Rédige un post via le même pipeline que /research et /link.
+
+        Renvoie None si le modèle est indisponible ou simulé : l'appelant
+        garde alors le texte brut de la source (jamais une publication sans
+        validation ; le texte brut reste corrigeable par consignes libres).
+        """
+        provider = self._llm()
+        if not getattr(provider, "is_real", False):
+            self._reply("Modèle non configuré ou simulé : texte brut du fichier utilisé (consignes libres possibles).")
+            return None
+        settings = self._research_settings()
+        prompt = research_mod.build_prompt(
+            topic,
+            [source],
+            tone=settings["tone"],
+            language=settings["language"],
+            length=settings["length"],
+            audience=settings["audience"],
+            style_context=self._memory_context(topic),
+        )
+        from . import llm as llm_mod
+
+        try:
+            result = provider.generate("linkedin_post", prompt)
+        except llm_mod.LLMError as exc:
+            self._reply(f"Rédaction impossible ({exc.code}) : {exc} — texte brut du fichier utilisé.")
+            return None
+        text = (result.text or "").strip()
+        if not text:
+            self._reply("Le modèle n'a rien proposé — texte brut du fichier utilisé.")
+            return None
+        return text
+
     # ------------------------------------------------------------------ images
 
     MAX_IMAGES_PER_DRAFT = media.MAX_IMAGES_PER_DRAFT
@@ -555,6 +605,239 @@ class Conversation:
             f"Révision {revision}. /preview pour voir le rendu et valider les images exactes."
         )
 
+    # ------------------------------------------------------------------ dossier
+
+    def _folder_command(self, arg: str) -> None:
+        folder = getattr(self.config, "local_folder", None)
+        if folder is None:
+            self._reply(
+                "Dossier local non configuré. Ajoutez dans config.toml :\n"
+                'local_folder = "D:/Linkedin"\n'
+                "puis redémarrez le bot. Le dossier n'est jamais écrit : lecture seule."
+            )
+            return
+        try:
+            listing = localfiles.list_files(folder)
+        except localfiles.LocalFilesError as exc:
+            self._reply(f"Dossier local indisponible ({exc.code}) : {exc}")
+            return
+        if not arg:
+            self._folder_listing(folder, listing)
+            return
+        token = arg.strip()
+        if token.lower().startswith("d") and token[1:].isdigit():
+            self._folder_document(listing, int(token[1:]))
+            return
+        if token.lower().startswith("img") and token[3:].isdigit():
+            self._folder_image(listing, int(token[3:]))
+            return
+        if token.lower().startswith("i") and token[1:].isdigit():
+            self._folder_image(listing, int(token[1:]))
+            return
+        if token.isdigit():
+            self._folder_text(listing, int(token))
+            return
+        self._reply(
+            "Usage : /folder liste ; /folder <n> texte → brouillon ; "
+            "/folder d<n> PDF → brouillon ; /folder i<n> image → brouillon actif."
+        )
+
+    def _folder_listing(self, folder, listing: dict) -> None:
+        texts = listing["texts"]
+        images = listing["images"]
+        documents = listing["documents"]
+        others = listing["others"]
+        if not texts and not images and not documents and not others:
+            self._reply(
+                f"Aucun fichier exploitable dans {folder}.\n"
+                "Textes attendus : .txt, .md — Images : .jpg, .jpeg, .png, .gif — Documents : .pdf."
+            )
+            return
+        lines = [f"Dossier local (lecture seule) : {folder}", ""]
+        if texts:
+            lines.append("Textes :")
+            lines += [f" {i + 1}. {name}" for i, name in enumerate(texts)]
+            lines.append("")
+        if documents:
+            lines.append("Documents (PDF) :")
+            lines += [f" d{i + 1}. {name}" for i, name in enumerate(documents)]
+            lines.append("")
+        if images:
+            lines.append("Images :")
+            lines += [f" i{i + 1}. {name}" for i, name in enumerate(images)]
+            lines.append("")
+        if others:
+            lines.append("Autres (non exploitables) :")
+            lines += [f" - {name}" for name in others]
+            lines.append("")
+        if listing["truncated"]:
+            lines.append("(liste tronquée : limite de fichiers affichés atteinte)")
+            lines.append("")
+        lines += [
+            "/folder <numéro> : le texte devient un brouillon.",
+            "/folder d<numéro> : le texte du PDF devient un brouillon.",
+            "/folder i<numéro> : l'image est attachée au brouillon actif.",
+        ]
+        self._reply("\n".join(lines))
+
+    def _folder_text(self, listing: dict, number: int) -> None:
+        texts = listing["texts"]
+        if not (1 <= number <= len(texts)):
+            self._reply(
+                f"Numéro invalide : 1 à {len(texts)} (textes listés). /folder pour revoir la liste."
+            )
+            return
+        name = texts[number - 1]
+        try:
+            raw = localfiles.read_text(self.config.local_folder, name)
+        except localfiles.LocalFilesError as exc:
+            self._reply(f"Fichier illisible ({exc.code}) : {exc}")
+            return
+        polished = self._write_post(
+            f"post LinkedIn à partir du fichier local « {name} »",
+            research_mod.Source(title=name, url="fichier local", excerpt=raw, images=[]),
+        )
+        text = polished if polished else raw
+        intro = (
+            "Proposition rédigée par le modèle à partir du fichier"
+            if polished
+            else "Texte du fichier"
+        )
+        draft_id = self._create_draft(text)
+        self._reply(
+            f"{intro} « {name} » (brouillon {draft_id[:8]}) :\n\n{text}\n\n"
+            "Corrigez librement (une consigne sera interprétée par le modèle), ajoutez une "
+            "image si besoin, puis /preview. Contenu de fichier = donnée non fiable : la "
+            "publication reste soumise à la chaîne TEXTE → IMAGE → bouton final."
+        )
+
+    def _folder_document(self, listing: dict, number: int) -> None:
+        documents = listing["documents"]
+        if not (1 <= number <= len(documents)):
+            self._reply(
+                f"Numéro invalide : d1 à d{len(documents)} (PDF listés). /folder pour revoir la liste."
+            )
+            return
+        name = documents[number - 1]
+        try:
+            raw = localfiles.read_document(self.config.local_folder, name)
+        except localfiles.LocalFilesError as exc:
+            if exc.code != "PDF_TEXT_EMPTY":
+                self._reply(f"PDF illisible ({exc.code}) : {exc}")
+                return
+            # PDF scanné (sans couche texte) : OCR vision du LLM.
+            raw = self._folder_ocr(name)
+            if raw is None:
+                return
+        polished = self._write_post(
+            f"post LinkedIn à partir du document local « {name} »",
+            research_mod.Source(title=name, url="fichier local", excerpt=raw, images=[]),
+        )
+        text = polished if polished else raw
+        intro = (
+            "Proposition rédigée par le modèle à partir du PDF"
+            if polished
+            else "Texte du PDF"
+        )
+        draft_id = self._create_draft(text)
+        self._reply(
+            f"{intro} « {name} » (brouillon {draft_id[:8]}) :\n\n{text}\n\n"
+            "Corrigez librement (une consigne sera interprétée par le modèle), puis /preview. "
+            "Contenu de fichier = donnée non fiable : la publication reste soumise à la "
+            "chaîne TEXTE → IMAGE → bouton final."
+        )
+        self._folder_propose_render(name)
+
+    def _folder_ocr(self, name: str) -> str | None:
+        """Lit le texte d'un PDF scanné : rendu de la 1re page + OCR vision.
+
+        La page rendue est un PNG en RAM ; l'OCR n'est jamais un garant du
+        contenu : le résultat devient un brouillon comme toute autre source.
+        """
+        try:
+            png, _ = localfiles.render_document_page(self.config.local_folder, name)
+        except localfiles.LocalFilesError as exc:
+            self._reply(f"OCR impossible ({exc.code}) : {exc}")
+            return None
+        from . import llm as llm_mod
+
+        try:
+            if self._llm_provider is not None:
+                provider = self._llm_provider
+            else:
+                pname = prefs.get(self.conn, "llm_provider") or "groq"
+                if pname == "none":
+                    self._reply("OCR indisponible : LLM désactivé (/settings).")
+                    return None
+                provider = llm_mod.vision_provider(pname)
+        except llm_mod.LLMError as exc:
+            self._reply(f"OCR indisponible ({exc.code}) : {exc}")
+            return None
+        prompt = (
+            "Extrais intégralement le texte visible dans cette image de document. "
+            "Réponds UNIQUEMENT avec le texte extrait, sans commentaire ni ajout."
+        )
+        try:
+            result = provider.generate_vision("ocr", prompt, png, "image/png")
+        except Exception as exc:  # noqa: BLE001 — l'OCR est un confort, jamais bloquant
+            self._reply(f"OCR impossible : {type(exc).__name__}: {exc}")
+            return None
+        text = (result.text or "").strip()
+        if not text:
+            self._reply("L'OCR n'a rien lu sur la page.")
+            return None
+        self._reply(f"Texte lu par OCR vision ({provider.name}/{provider.model}).")
+        return text
+
+    def _folder_propose_render(self, name: str) -> None:
+        """Propose la 1re page du PDF rendue en image (RAM seule, jamais
+        attachée sans clic explicite, comme toute image proposée)."""
+        try:
+            png, _ = localfiles.render_document_page(self.config.local_folder, name)
+            asset = self.buffer.add(
+                png,
+                content_type="image/png",
+                filename=name.rsplit("/", 1)[-1].rsplit(".", 1)[0] + ".png",
+                source="folder_pdf",
+            )
+            self.client.send_photo(
+                self.config.chat_id,
+                asset.data,
+                caption=f"Page 1 du PDF rendue en image ({asset.content_type}, empreinte {asset.sha256[:12]})",
+                content_type=asset.content_type,
+            )
+        except Exception:  # noqa: BLE001 — la proposition est un bonus, jamais bloquant
+            return
+        self._reply(
+            "Image candidate proposée depuis le PDF. Cliquez pour l'attacher au brouillon actif, "
+            "ou /preview pour valider sans image.",
+            keyboard([("Utiliser l'image du PDF", f"use:{asset.token}")]),
+        )
+
+    def _folder_image(self, listing: dict, number: int) -> None:
+        images = listing["images"]
+        if not (1 <= number <= len(images)):
+            self._reply(
+                f"Numéro invalide : i1 à i{len(images)} (images listées). /folder pour revoir la liste."
+            )
+            return
+        name = images[number - 1]
+        try:
+            data = localfiles.read_image(self.config.local_folder, name)
+            asset = self.buffer.add(
+                data,
+                content_type="",
+                filename=name.rsplit("/", 1)[-1],
+                source="folder",
+            )
+        except localfiles.LocalFilesError as exc:
+            self._reply(f"Image refusée ({exc.code}) : {exc}")
+            return
+        except media.MediaError as exc:
+            self._reply(f"Image refusée ({exc.code}) : {exc}")
+            return
+        self._attach_asset(asset)
+
     def _current_text(self, draft_id: str) -> str:
         row = self.conn.execute(
             "SELECT v.text FROM draft_versions v JOIN drafts d ON d.id = v.draft_id "
@@ -709,6 +992,10 @@ class Conversation:
                 self._image_add_mode(data[7:])
             elif data.startswith("use:"):
                 self._use_proposed(data[4:])
+            elif data.startswith("lang:"):
+                self._language_command(data[5:])
+            elif data.startswith("resume:"):
+                self._resume_draft(data[7:])
             else:
                 self._reply("Bouton inconnu ou expiré. Refaites /preview.")
         except store.StoreError as exc:
@@ -886,6 +1173,124 @@ class Conversation:
             self._reply(f"Réglage refusé ({exc.code}) : {exc}")
             return
         self._reply(f"Réglage enregistré : {key} = {normalized}. Même base que le tableau de bord.")
+
+    def _language_command(self, arg: str) -> None:
+        """Langue des posts générés : /language fr|en|ar (ou boutons)."""
+        value = (arg or "").strip().lower()
+        if not value:
+            try:
+                current = prefs.get(self.conn, "editorial_language") or "fr"
+            except prefs.PreferencesError:
+                current = "fr"
+            self._reply(
+                f"Langue des posts : {current}. Choisissez :",
+                keyboard(
+                    [
+                        ("Français", "lang:fr"),
+                        ("English", "lang:en"),
+                        ("العربية", "lang:ar"),
+                    ]
+                ),
+            )
+            return
+        try:
+            normalized = prefs.set_value(self.conn, "editorial_language", value)
+        except prefs.PreferencesError as exc:
+            self._reply(f"Langue refusée ({exc.code}) : {exc}. Choix : fr, en, ar.")
+            return
+        self._reply(
+            f"Langue des posts : {normalized}. Les prochaines générations (dossier, recherche, "
+            "lien, /humanize) utiliseront cette langue."
+        )
+
+    HUMANIZE_INSTRUCTION = (
+        "Réécris ce post pour qu'il sonne vraiment humain, comme écrit par une personne "
+        "réelle et non par une IA. Varie le rythme (phrases courtes et longues), garde un "
+        "ton direct et personnel à la première personne, utilise des formulations concrètes. "
+        "Supprime les tournures d'IA (« il est important de noter », « plongeons », "
+        "« dans un monde où », « n'est-ce pas ? »), les tirets cadratins, les emojis, les "
+        "hashtags et les listes à puces. Conserve les faits, le sens et la langue du texte."
+    )
+
+    def _humanize_command(self) -> None:
+        """Réécrit le brouillon actif pour un ton plus humain (nouvelle révision)."""
+        draft_id = self._active_draft()
+        if not draft_id or not self._current_text(draft_id).strip():
+            self._reply("Aucun brouillon actif avec du texte. /new, /folder d1 ou un texte d'abord.")
+            return
+        result = self._llm_revise(draft_id, self.HUMANIZE_INSTRUCTION)
+        if result is None:
+            self._reply(
+                "Humanisation impossible (modèle simulé/indisponible ou texte inchangé). "
+                "Vérifiez /settings llm_provider et llm_model."
+            )
+            return
+        text, note = result
+        manifest = self._manifest(text, images=self._current_images(draft_id))
+        try:
+            revision = store.add_revision(self.conn, draft_id, text, manifest)
+        except store.StoreError as exc:
+            self._reply(f"Enregistrement refusé ({exc.code}) : {exc}")
+            return
+        self._reply(
+            f"Texte humanisé{note} — révision {revision} :\n\n{text}\n\n"
+            "/preview pour vérifier et valider le texte exact."
+        )
+
+    def _drafts_command(self) -> None:
+        """Liste les brouillons sauvegardés (hors publiés) et permet d'en reprendre un."""
+        rows = self.conn.execute(
+            "SELECT d.id, d.state, d.current_revision, d.updated_at, v.text "
+            "FROM drafts d LEFT JOIN draft_versions v ON v.draft_id = d.id "
+            "AND v.revision = d.current_revision "
+            "WHERE d.current_revision > 0 AND d.state != 'PUBLISHED' "
+            "ORDER BY d.updated_at DESC LIMIT 10"
+        ).fetchall()
+        if not rows:
+            self._reply("Aucun brouillon sauvegardé (hors publications). /new ou /folder pour commencer.")
+            return
+        lines = [
+            "Brouillons sauvegardés (les images vivent en RAM : perdues après redémarrage) :",
+            "",
+        ]
+        buttons = []
+        for index, row in enumerate(rows, start=1):
+            preview = " ".join((row["text"] or "").split())[:50] or "(vide)"
+            lines.append(f"{index}. [{row['state']}] rev {row['current_revision']} — {preview}")
+            buttons.append((f"Reprendre {index}", f"resume:{row['id']}"))
+        lines += ["", "Reprendre réactive le brouillon : /preview pour valider, consignes libres pour corriger."]
+        self._reply("\n".join(lines), keyboard(buttons))
+
+    def _resume_draft(self, draft_id: str) -> None:
+        row = self.conn.execute(
+            "SELECT state, current_revision FROM drafts WHERE id = ?", (draft_id,)
+        ).fetchone()
+        if row is None or row["current_revision"] == 0:
+            self._reply("Brouillon introuvable ou vide.")
+            return
+        if row["state"] == "PUBLISHED":
+            self._reply("Ce brouillon est déjà publié ; un doublon serait refusé à l'envoi.")
+            return
+        if row["state"] == "BLOCKED":
+            self._reply(
+                "Ce brouillon est bloqué (échec ou résultat incertain) : résolution explicite "
+                "requise avant toute nouvelle publication. /status pour l'état."
+            )
+            return
+        store.set_setting(self.conn, "active_draft", draft_id)
+        text = self._current_text(draft_id)
+        images = self._current_images(draft_id)
+        note = ""
+        if images:
+            note = (
+                f"\n\n⚠ {len(images)} image(s) référencée(s) mais les octets approuvés ne sont "
+                "plus en RAM : renvoyez la photo ou /folder i<n> pour la rattacher, puis /preview."
+            )
+        self._reply(
+            f"Brouillon réactivé (révision {row['current_revision']}) :\n\n{text}\n\n"
+            "/preview pour valider (nouvelles validations texte/image requises), "
+            "ou un message libre pour corriger." + note
+        )
 
     def _reminder_command(self, arg: str) -> None:
         if arg == "on":

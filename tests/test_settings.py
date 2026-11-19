@@ -116,3 +116,23 @@ def test_settings_are_shared_single_source(conn, conv):
     conv.handle(msg("/settings reminder_hour 6", uid=1))
     assert store.get_setting(conn, "reminder_hour") == "6"
     assert reminders._settings(conn)["hour"] == 6
+
+
+def test_language_command_sets_pref(conn, conv):
+    conv.handle(msg("/language en", uid=1))
+    assert "Langue des posts : en" in conv.client.sent[-1][1]
+    assert prefs.get(conn, "editorial_language") == "en"
+    conv.handle(msg("/language xx", uid=2))
+    assert "Langue refusée" in conv.client.sent[-1][1]
+    assert prefs.get(conn, "editorial_language") == "en"
+
+
+def test_language_command_shows_buttons_and_callback(conn, conv):
+    from test_phase2 import cb
+
+    conv.handle(msg("/language", uid=1))
+    markup = conv.client.sent[-1][2]
+    buttons = [b["callback_data"] for row in markup["inline_keyboard"] for b in row]
+    assert buttons == ["lang:fr", "lang:en", "lang:ar"]
+    conv.handle(cb("lang:ar", uid=2))
+    assert prefs.get(conn, "editorial_language") == "ar"

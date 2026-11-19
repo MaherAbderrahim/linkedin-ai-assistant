@@ -191,6 +191,33 @@ def test_free_text_falls_back_to_raw_on_llm_error(conn, conv_with_llm, client):
     assert any("interprétation LLM impossible" in sent[1] for sent in client.sent)
 
 
+def test_humanize_rewrites_active_draft(conn, conv_with_llm, client):
+    conv, llm = conv_with_llm
+    conv.handle(msg("/new", uid=1))
+    conv.handle(msg("Post initial très corporate.", uid=2))
+    conv.handle(msg("/humanize", uid=3))
+    task, prompt = llm.prompts[-1]
+    assert task == "draft_revision"
+    assert "humain" in prompt
+    version = conn.execute(
+        "SELECT text FROM draft_versions ORDER BY revision DESC LIMIT 1"
+    ).fetchone()
+    assert version["text"] == "Post réécrit par le modèle."
+    assert any("humanisé" in sent[1] for sent in client.sent)
+
+
+def test_humanize_without_draft(conv):
+    conv.handle(msg("/humanize", uid=1))
+    assert "Aucun brouillon actif" in conv.client.sent[-1][1]
+
+
+def test_humanize_with_simulated_llm(conn, conv, client):
+    conv.handle(msg("/new", uid=1))
+    conv.handle(msg("Texte sans IA réelle.", uid=2))
+    conv.handle(msg("/humanize", uid=3))
+    assert any("Humanisation impossible" in sent[1] for sent in client.sent)
+
+
 def test_first_text_of_empty_draft_is_saved_raw(conn, conv_with_llm, client):
     conv, llm = conv_with_llm
     conv.handle(msg("/new", uid=1))
