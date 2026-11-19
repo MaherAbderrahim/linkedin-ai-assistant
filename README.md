@@ -2,7 +2,7 @@
 
 Assistant personnel pour rechercher, rédiger, corriger et publier du contenu LinkedIn depuis Telegram, **uniquement après validations explicites**. Dépôt public réutilisable : chaque utilisateur l'installe chez lui avec **ses propres comptes** — voir [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md).
 
-**Statut au 16 novembre 2026 : chaîne complète opérationnelle.** `/research <sujet>` (ou `/link <url>`) déclenche une recherche réelle bornée (Tavily) suivie d'une proposition de post rédigée par Groq/OpenRouter **informée par votre archive locale** (profil de style recalculable + exemples récents + règles confirmées) ; un message libre sur un brouillon existant est **interprété par le LLM** (consigne ou texte final) ; les images sont proposées par le bot **en photo dans Telegram** (bouton « Utiliser ») ou ajoutées depuis le téléphone / une URL, et vivent **en RAM uniquement** (jusqu'à 4 par post) ; `/preview` affiche le texte **et** toutes les images ; les validations sont TEXT → IMAGE/absence → autorisation finale à usage unique ; la publication part par l'API LinkedIn officielle via treg (`POST /rest/posts`), images comprises. **254 tests passent sans réseau.** Publication réelle activée par configuration (`publisher = "treg"`) : le clic final du bouton unique publie vraiment, sur la révision exacte approuvée.
+**Statut au 19 novembre 2026 : chaîne complète opérationnelle.** `/research <sujet>` (ou `/link <url>`) déclenche une recherche réelle bornée (Tavily) suivie d'une proposition de post rédigée par Groq/OpenRouter **informée par votre archive locale** (profil de style recalculable + exemples récents + règles confirmées) ; **`/folder`** transforme en brouillon les fichiers d'un dossier local en **lecture seule** (textes, PDF — texte extrait ou OCR vision pour les scans — et images, la 1re page du PDF étant proposée en photo) ; **`/language`** choisit la langue des posts (`fr`/`en`/`ar`) et **`/humanize`** réécrit un brouillon pour un ton plus humain ; **`/drafts`** liste et reprend un brouillon sauvegardé ; un message libre sur un brouillon existant est **interprété par le LLM** (consigne ou texte final) ; les posts sont rédigés **à la première personne** (« je ») ; les images sont proposées par le bot **en photo dans Telegram** (bouton « Utiliser ») ou ajoutées depuis le téléphone / une URL / le dossier local, et vivent **en RAM uniquement** (jusqu'à 4 par post) ; `/preview` affiche le texte **et** toutes les images ; les validations sont TEXT → IMAGE/absence → autorisation finale à usage unique ; la publication part par l'API LinkedIn officielle via treg (`POST /rest/posts`), images comprises. **297 tests passent sans réseau.** Publication réelle activée par configuration (`publisher = "treg"`) : le clic final du bouton unique publie vraiment, sur la révision exacte approuvée.
 
 ## Démarrage rapide
 
@@ -13,8 +13,10 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -e ".[dev]"
 Copy-Item config.example.toml config.toml   # à adapter (Linux/macOS : cp)
 Copy-Item .env.example .env
-.venv\Scripts\python -m pytest -q           # ~254 tests, aucun appel réseau
+.venv\Scripts\python -m pytest -q           # ~297 tests, aucun appel réseau
 ```
+
+Sur Windows, `start-bot.cmd` lance ensuite le bot avec log dans `data\bot.log`.
 
 Créez ensuite vos comptes et clés (Telegram BotFather, Groq, Tavily, treg/LinkedIn) : la marche à suivre complète est dans **[docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md)** — y compris le **prompt prêt à coller à votre agent de codage** pour qu'il fasse l'installation avec vous.
 
@@ -63,7 +65,7 @@ Le **skill Apify a été audité** (voir [APIFY_SKILL_AUDIT.md](docs/APIFY_SKILL
 | [APIFY_SKILL_AUDIT.md](docs/APIFY_SKILL_AUDIT.md) | Audit du skill Apify : fonctionnement, Actors, coûts, limites, conformité, intégration |
 | [QUALIFICATION_TREG.md](docs/QUALIFICATION_TREG.md) | Runbook de qualification réelle treg (`/rest/posts` + image) ; chaque étape exige une autorisation distincte |
 
-Code : `src/linkedin_assistant/` (bibliothèque standard uniquement), tests dans `tests/`.
+Code : `src/linkedin_assistant/` (bibliothèque standard + `pypdf`/`pypdfium2`/`pillow` pour les PDF locaux), tests dans `tests/`.
 
 ### Mode de publication
 
@@ -77,6 +79,21 @@ linkedin_api_version = "202611" # LinkedIn-Version YYYYMM, choisie explicitement
 - `publisher = "simulated"` : aucun appel externe, utile pour apprendre le parcours.
 - `publisher = "treg"` : publication réelle via la connexion treg résolue dynamiquement à chaque envoi. Aucun repli silencieux : sans version d'API explicite, le bot refuse de démarrer. La publication reste soumise aux trois validations dans le bot.
 
+### Dossier local (`/folder`, lecture seule)
+
+`config.toml` accepte une clé facultative :
+
+```toml
+local_folder = "D:/Linkedin"   # ou tout dossier absolu de votre machine
+```
+
+- `/folder` liste récursivement les **textes** (`.txt`, `.md`), **PDF** et **images** (`.jpg/.jpeg/.png/.gif`) du dossier, plus une section « Autres » (non exploitables) — rien n'est invisible.
+- `/folder <n>` : le texte devient un brouillon **rédigé par le LLM** (même pipeline que `/research` : ton, langue, longueur, style, première personne).
+- `/folder d<n>` : PDF → texte extrait (`pypdf`) ; si le PDF est un scan sans couche texte, la page est rendue en image et lue par **OCR vision** (modèle multimodal gratuit du fournisseur choisi). La 1re page est aussi **proposée en photo** (bouton « Utiliser »).
+- `/folder i<n>` : l'image est attachée au brouillon actif (RAM seule, empreinte exacte).
+- **Sandbox stricte** : chemins résolus et confinés au dossier (traversée `..`, chemins absolus et liens symboliques sortants refusés) ; le bot **n'écrit, ne renomme et ne supprime jamais** dans ce dossier ; bornes de taille et de nombre de fichiers.
+- Le contenu d'un fichier est une **donnée non fiable** : il ne déclenche jamais une publication, il devient un brouillon soumis à la chaîne TEXT → IMAGE → bouton final.
+
 ### Commandes Telegram
 
 | Commande | Effet |
@@ -86,6 +103,10 @@ linkedin_api_version = "202611" # LinkedIn-Version YYYYMM, choisie explicitement
 | `/link <url>` | lecture de la page puis proposition de post |
 | message libre | consigne interprétée par le LLM sur le brouillon courant, ou texte final si le message est déjà complet |
 | `/image <url>`, photo, bouton « Utiliser » | image en RAM, attachée au brouillon actif (jusqu'à 4 par post) |
+| `/folder` | dossier local en lecture seule : `/folder <n>` texte → brouillon, `/folder d<n>` PDF → brouillon (+ image proposée), `/folder i<n>` image → brouillon actif |
+| `/language [fr\|en\|ar]` | langue des posts générés (boutons si sans argument) |
+| `/humanize` | réécrit le brouillon actif pour un ton plus humain (nouvelle révision, validations requises) |
+| `/drafts` | liste les brouillons sauvegardés (hors publiés) ; bouton « Reprendre » (images à rattacher : RAM seule) |
 | `/preview` | texte exact + toutes les photos + boutons de validation |
 | `/status` `/cancel` `/lastpost <date>` `/reminder on\|off` `/settings <clé> <valeur>` | état, brouillon, déclaration externe, rappels, paramètres |
 
